@@ -266,8 +266,7 @@ func (p *Policy) sanitize(r io.Reader, w io.Writer) error {
 		case html.StartTagToken:
 
 			mostRecentlyStartedToken = normaliseElementName(token.Data)
-
-			switch normaliseElementName(token.Data) {
+			switch mostRecentlyStartedToken {
 			case `script`:
 				if !p.allowUnsafe {
 					continue
@@ -320,11 +319,12 @@ func (p *Policy) sanitize(r io.Reader, w io.Writer) error {
 
 		case html.EndTagToken:
 
-			if mostRecentlyStartedToken == normaliseElementName(token.Data) {
+			elementName := normaliseElementName(token.Data)
+			if mostRecentlyStartedToken == elementName {
 				mostRecentlyStartedToken = ""
 			}
 
-			switch normaliseElementName(token.Data) {
+			switch elementName {
 			case `script`:
 				if !p.allowUnsafe {
 					continue
