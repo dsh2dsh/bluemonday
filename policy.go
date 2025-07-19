@@ -192,7 +192,7 @@ type AttrPolicyBuilder struct {
 	allowEmpty bool
 }
 
-type stylePolicyBuilder struct {
+type StylePolicyBuilder struct {
 	p *Policy
 
 	propertyNames []string
@@ -419,10 +419,10 @@ func (abp *AttrPolicyBuilder) Globally() *Policy {
 //
 // The style policy is only added to the core policy when either Globally()
 // or OnElements(...) are called.
-func (p *Policy) AllowStyles(propertyNames ...string) *stylePolicyBuilder {
+func (p *Policy) AllowStyles(propertyNames ...string) *StylePolicyBuilder {
 	p.init()
 
-	abp := stylePolicyBuilder{
+	abp := StylePolicyBuilder{
 		p: p,
 	}
 
@@ -435,7 +435,7 @@ func (p *Policy) AllowStyles(propertyNames ...string) *stylePolicyBuilder {
 
 // Matching allows a regular expression to be applied to a nascent style
 // policy, and returns the style policy.
-func (spb *stylePolicyBuilder) Matching(regex *regexp.Regexp) *stylePolicyBuilder {
+func (spb *StylePolicyBuilder) Matching(regex *regexp.Regexp) *StylePolicyBuilder {
 	spb.regexp = regex
 
 	return spb
@@ -443,7 +443,7 @@ func (spb *stylePolicyBuilder) Matching(regex *regexp.Regexp) *stylePolicyBuilde
 
 // MatchingEnum allows a list of allowed values to be applied to a nascent style
 // policy, and returns the style policy.
-func (spb *stylePolicyBuilder) MatchingEnum(enum ...string) *stylePolicyBuilder {
+func (spb *StylePolicyBuilder) MatchingEnum(enum ...string) *StylePolicyBuilder {
 	spb.enum = enum
 
 	return spb
@@ -451,7 +451,7 @@ func (spb *stylePolicyBuilder) MatchingEnum(enum ...string) *stylePolicyBuilder 
 
 // MatchingHandler allows a handler to be applied to a nascent style
 // policy, and returns the style policy.
-func (spb *stylePolicyBuilder) MatchingHandler(handler func(string) bool) *stylePolicyBuilder {
+func (spb *StylePolicyBuilder) MatchingHandler(handler func(string) bool) *StylePolicyBuilder {
 	spb.handler = handler
 
 	return spb
@@ -459,7 +459,7 @@ func (spb *stylePolicyBuilder) MatchingHandler(handler func(string) bool) *style
 
 // OnElements will bind a style policy to a given range of HTML elements
 // and return the updated policy
-func (spb *stylePolicyBuilder) OnElements(elements ...string) *Policy {
+func (spb *StylePolicyBuilder) OnElements(elements ...string) *Policy {
 	for _, element := range elements {
 		element = strings.ToLower(element)
 
@@ -488,7 +488,7 @@ func (spb *stylePolicyBuilder) OnElements(elements ...string) *Policy {
 
 // OnElementsMatching will bind a style policy to any HTML elements matching the pattern
 // and return the updated policy
-func (spb *stylePolicyBuilder) OnElementsMatching(regex *regexp.Regexp) *Policy {
+func (spb *StylePolicyBuilder) OnElementsMatching(regex *regexp.Regexp) *Policy {
 	for _, attr := range spb.propertyNames {
 		if _, ok := spb.p.elsMatchingAndStyles[regex]; !ok {
 			spb.p.elsMatchingAndStyles[regex] = make(map[string][]stylePolicy)
@@ -513,7 +513,7 @@ func (spb *stylePolicyBuilder) OnElementsMatching(regex *regexp.Regexp) *Policy 
 
 // Globally will bind a style policy to all HTML elements and return the
 // updated policy
-func (spb *stylePolicyBuilder) Globally() *Policy {
+func (spb *StylePolicyBuilder) Globally() *Policy {
 	for _, attr := range spb.propertyNames {
 		if _, ok := spb.p.globalStyles[attr]; !ok {
 			spb.p.globalStyles[attr] = []stylePolicy{}
