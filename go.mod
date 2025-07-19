@@ -4,7 +4,7 @@ go 1.24
 
 require (
 	github.com/aymerick/douceur v0.2.0
-	golang.org/x/net v0.26.0
+	golang.org/x/net v0.42.0
 )
 
 require github.com/gorilla/css v1.0.1 // indirect
