@@ -465,9 +465,7 @@ func (p *Policy) sanitize(r io.Reader, w io.Writer) error {
 // sanitizeAttrs takes a set of element attribute policies and the global
 // attribute policies and applies them to the []html.Attribute returning a set
 // of html.Attributes that match the policies
-func (p *Policy) sanitizeAttrs(
-	elementName string,
-	attrs []html.Attribute,
+func (p *Policy) sanitizeAttrs(elementName string, attrs []html.Attribute,
 	aps map[string][]attrPolicy,
 ) []html.Attribute {
 	if p.callbackAttr != nil {
@@ -497,7 +495,7 @@ func (p *Policy) sanitizeAttrs(
 
 	// Builds a new attribute slice based on the whether the attribute has been
 	// allowed explicitly or globally.
-	cleanAttrs := []html.Attribute{}
+	cleanAttrs := attrs[:0]
 attrsLoop:
 	for _, htmlAttr := range attrs {
 		if p.allowDataAttributes {
@@ -567,7 +565,7 @@ attrsLoop:
 			// - q.cite
 			// - img.src
 			// - script.src
-			tmpAttrs := []html.Attribute{}
+			tmpAttrs := cleanAttrs[:0]
 			for _, htmlAttr := range cleanAttrs {
 				switch elementName {
 				case "a", "area", "base", "link":
@@ -656,7 +654,7 @@ attrsLoop:
 					addTargetBlank := (externalLink &&
 						p.addTargetBlankToFullyQualifiedLinks)
 
-					tmpAttrs := []html.Attribute{}
+					tmpAttrs := cleanAttrs[:0]
 					for _, htmlAttr := range cleanAttrs {
 
 						var appended bool
@@ -735,7 +733,7 @@ attrsLoop:
 						// double processing only happens *if* target="_blank"
 						// is true.
 						var noOpenerAdded bool
-						tmpAttrs := []html.Attribute{}
+						tmpAttrs := cleanAttrs[:0]
 						for _, htmlAttr := range cleanAttrs {
 							var appended bool
 							if htmlAttr.Key == "rel" {
@@ -923,67 +921,69 @@ func (p *Policy) allowNoAttrs(elementName string) bool {
 }
 
 func (p *Policy) validURL(rawurl string) (string, bool) {
-	if p.requireParseableURLs {
-		// URLs are valid if when space is trimmed the URL is valid
-		rawurl = strings.TrimSpace(rawurl)
+	if !p.requireParseableURLs {
+		return rawurl, true
+	}
 
-		// URLs cannot contain whitespace, unless it is a data-uri
-		if strings.Contains(rawurl, " ") ||
-			strings.Contains(rawurl, "\t") ||
-			strings.Contains(rawurl, "\n") {
-			if !strings.HasPrefix(rawurl, `data:`) {
-				return "", false
-			}
+	// URLs are valid if when space is trimmed the URL is valid
+	rawurl = strings.TrimSpace(rawurl)
 
-			// Remove \r and \n from base64 encoded data to pass url.Parse.
-			matched := dataURIbase64Prefix.FindString(rawurl)
-			if matched != "" {
-				rawurl = matched + strings.ReplaceAll(
-					strings.ReplaceAll(rawurl[len(matched):], "\r", ""), "\n", "")
-			}
-		}
-
-		// URLs are valid if they parse
-		u, err := url.Parse(rawurl)
-		if err != nil {
+	// URLs cannot contain whitespace, unless it is a data-uri
+	if strings.Contains(rawurl, " ") ||
+		strings.Contains(rawurl, "\t") ||
+		strings.Contains(rawurl, "\n") {
+		if !strings.HasPrefix(rawurl, `data:`) {
 			return "", false
 		}
 
-		if u.Scheme != "" {
-			urlPolicies, ok := p.allowURLSchemes[u.Scheme]
-			if !ok {
-				for _, r := range p.allowURLSchemeRegexps {
-					if r.MatchString(u.Scheme) {
-						return u.String(), true
-					}
-				}
-
-				return "", false
-			}
-
-			if len(urlPolicies) == 0 {
-				return u.String(), true
-			}
-
-			for _, urlPolicy := range urlPolicies {
-				if urlPolicy(u) {
-					return u.String(), true
-				}
-			}
-
-			return "", false
+		// Remove \r and \n from base64 encoded data to pass url.Parse.
+		matched := dataURIbase64Prefix.FindString(rawurl)
+		if matched != "" {
+			rawurl = matched + strings.ReplaceAll(
+				strings.ReplaceAll(rawurl[len(matched):], "\r", ""), "\n", "")
 		}
+	}
 
-		if p.allowRelativeURLs {
-			if u.String() != "" {
-				return u.String(), true
-			}
-		}
-
+	// URLs are valid if they parse
+	u, err := url.Parse(rawurl)
+	if err != nil {
 		return "", false
 	}
 
-	return rawurl, true
+	if !u.IsAbs() {
+		if p.allowRelativeURLs && u.String() != "" {
+			return p.rewriteURL(u), true
+		}
+		return "", false
+	}
+
+	urlPolicies, ok := p.allowURLSchemes[u.Scheme]
+	if !ok {
+		for _, r := range p.allowURLSchemeRegexps {
+			if r.MatchString(u.Scheme) {
+				return p.rewriteURL(u), true
+			}
+		}
+		return "", false
+	}
+
+	if len(urlPolicies) == 0 {
+		return p.rewriteURL(u), true
+	}
+
+	for _, urlPolicy := range urlPolicies {
+		if urlPolicy(u) {
+			return p.rewriteURL(u), true
+		}
+	}
+	return "", false
+}
+
+func (p *Policy) rewriteURL(u *url.URL) string {
+	if p.urlRewriter != nil {
+		p.urlRewriter(u)
+	}
+	return u.String()
 }
 
 func linkable(elementName string) bool {

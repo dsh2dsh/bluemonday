@@ -170,6 +170,11 @@ type Policy struct {
 	// element's attributes. If the callback returns nil or empty array of html
 	// attributes then the attributes will not be included in the output.
 	callbackAttr CallbackAttrFunc
+
+	// If urlRewriter is not nil, it is used to rewrite any attribute of tags that
+	// download resources, such as <a> or <img>. It requires that the URL is
+	// parsable by "net/url" url.Parse().
+	urlRewriter func(u *url.URL)
 }
 
 type attrPolicy struct {
@@ -275,6 +280,13 @@ func NewPolicy() *Policy {
 // the output. SetCallbackForAttributes is not goroutine safe.
 func (p *Policy) SetCallbackForAttributes(cb CallbackAttrFunc) *Policy {
 	p.callbackAttr = cb
+	return p
+}
+
+// RewriteURL will rewrite any attribute of a resource downloading tag
+// (e.g. <a>, <img>, <script>, <iframe>) using the provided function.
+func (p *Policy) RewriteURL(fn func(u *url.URL)) *Policy {
+	p.urlRewriter = fn
 	return p
 }
 

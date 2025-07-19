@@ -38,6 +38,8 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/net/html"
 )
 
@@ -4166,5 +4168,45 @@ func TestCallbackForAttributes(t *testing.T) {
 				tt.expected,
 			)
 		}
+	}
+}
+
+func TestRewriteURL(t *testing.T) {
+	tests := []struct {
+		name     string
+		in       string
+		expected string
+	}{
+		{
+			name:     "abs",
+			in:       `<a href="http://www.google.com">`,
+			expected: `<a href="http://www.google.com" rel="nofollow noreferrer noopener" target="_blank">`,
+		},
+		{
+			name:     "rel",
+			in:       `<a href="/page2.html">`,
+			expected: `<a href="https://example.com/page2.html" rel="nofollow noreferrer noopener" target="_blank">`,
+		},
+	}
+
+	pageURL, err := url.Parse("https://example.com/page.html")
+	require.NoError(t, err)
+
+	p := UGCPolicy().
+		RequireNoReferrerOnLinks(true).
+		AddTargetBlankToFullyQualifiedLinks(true)
+
+	p.RewriteURL(func(u *url.URL) {
+		if u.IsAbs() {
+			return
+		}
+		u2 := pageURL.ResolveReference(u)
+		*u = *u2
+	})
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, p.Sanitize(tt.in))
+		})
 	}
 }

@@ -10,6 +10,21 @@ This project is a fork of bluemonday. Changes from
 
   [#153]:https://github.com/microcosm-cc/bluemonday/pull/153
 
+* Rewriting URL of any attribute of a resource downloading tags
+
+  `RewriteURL()` will rewrite any attribute of a resource downloading tag (e.g.
+  `<a>`, `<img>`, `<script>`, `<iframe>`) using the provided function. Like:
+
+  ```go
+  p.RewriteURL(func(u *url.URL) {
+    if u.IsAbs() {
+      return
+    }
+    u2 := pageURL.ResolveReference(u)
+    *u = *u2
+  })
+  ```
+
 bluemonday is a HTML sanitizer implemented in Go. It is fast and highly configurable.
 
 bluemonday takes untrusted user generated content as an input, and will return HTML that has been sanitised against an allowlist of approved HTML elements and attributes so that you can safely include the content in your web page.
