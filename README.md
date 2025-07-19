@@ -3,7 +3,12 @@
 [![Go](https://github.com/dsh2dsh/bluemonday/actions/workflows/go.yml/badge.svg)](https://github.com/dsh2dsh/bluemonday/actions/workflows/go.yml)
 [![GoDoc](https://godoc.org/github.com/dsh2dsh/bluemonday?status.png)](https://godoc.org/github.com/dsh2dsh/bluemonday)
 
-This project is a fork of bluemonday.
+This project is a fork of bluemonday. Changes from
+[upstream](https://github.com/microcosm-cc/bluemonday):
+
+* Callback Function for element's attributes from [#153]
+
+  [#153]:https://github.com/microcosm-cc/bluemonday/pull/153
 
 bluemonday is a HTML sanitizer implemented in Go. It is fast and highly configurable.
 
@@ -258,6 +263,22 @@ p.AllowAttrs("style").OnElements("span", "p")
 // Allow the 'color' property with values validated by the handler (on any element allowed a 'style' attribute)
 p.AllowStyles("color").MatchingHandler(myHandler).Globally()
 ```
+
+### Callback Function for element's attributes
+
+If you need to add/modify/delete the attributes of a given element you can use
+set a callback function with:
+
+```go
+SetCallbackForAttributes(func(elementName string, attrs []html.Attribute) []html.Attribute {
+	return attrs
+})
+```
+
+This function will be called before the element's attributes are parsed. The
+callback function can add/remove/modify the element's attributes. If the
+callback returns nil or empty array of html attributes then the attributes will
+not be included in the output.
 
 ### Links
 

@@ -36,6 +36,8 @@ import (
 	"regexp"
 	"strings"
 
+	"golang.org/x/net/html"
+
 	"github.com/dsh2dsh/bluemonday/css"
 )
 
@@ -162,6 +164,12 @@ type Policy struct {
 	// and can lead to XSS being rendered thus defeating the purpose of using a
 	// HTML sanitizer.
 	allowUnsafe bool
+
+	// callbackAttr is callback function that will be called before element's
+	// attributes are parsed. The callback function can add/remove/modify the
+	// element's attributes. If the callback returns nil or empty array of html
+	// attributes then the attributes will not be included in the output.
+	callbackAttr CallbackAttrFunc
 }
 
 type attrPolicy struct {
@@ -200,6 +208,12 @@ type StylePolicyBuilder struct {
 	enum          []string
 	handler       func(string) bool
 }
+
+// CallbackAttrFunc is callback function that will be called before element's
+// attributes are parsed. The callback function can add/remove/modify the
+// element's attributes. If the callback returns nil or empty array of html
+// attributes then the attributes will not be included in the output.
+type CallbackAttrFunc = func(elementName string, attrs []html.Attribute) []html.Attribute
 
 type urlPolicy func(url *url.URL) (allowUrl bool)
 
@@ -252,6 +266,16 @@ func NewPolicy() *Policy {
 	p.addDefaultSkipElementContent()
 
 	return &p
+}
+
+// SetCallbackForAttributes sets the callback function that will be called
+// before element's attributes are parsed. The callback function can
+// add/remove/modify the element's attributes. If the callback returns nil or
+// empty array of html attributes then the attributes will not be included in
+// the output. SetCallbackForAttributes is not goroutine safe.
+func (p *Policy) SetCallbackForAttributes(cb CallbackAttrFunc) *Policy {
+	p.callbackAttr = cb
+	return p
 }
 
 // AllowAttrs takes a range of HTML attribute names and returns an
