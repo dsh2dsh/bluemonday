@@ -201,8 +201,10 @@ type asStringWriter struct {
 	io.Writer
 }
 
+var _ io.StringWriter = (*asStringWriter)(nil)
+
 func (a *asStringWriter) WriteString(s string) (int, error) {
-	return a.Write([]byte(s)) //nolint:wrapcheck // just a forward
+	return a.Write([]byte(s)) //nolint:wrapcheck // call forwarder
 }
 
 func (p *Policy) sanitize(r io.Reader, w io.Writer) error {
@@ -214,7 +216,7 @@ func (p *Policy) sanitize(r io.Reader, w io.Writer) error {
 	// would initialize the maps, then we need to do that.
 	p.init()
 
-	buff, ok := w.(stringWriterWriter)
+	buff, ok := w.(io.StringWriter)
 	if !ok {
 		buff = &asStringWriter{w}
 	}
@@ -1087,9 +1089,4 @@ func normaliseElementName(str string) string {
 			`"`),
 		`"`,
 	)
-}
-
-type stringWriterWriter interface {
-	io.Writer
-	io.StringWriter
 }
