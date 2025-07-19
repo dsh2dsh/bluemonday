@@ -31,6 +31,7 @@ package bluemonday
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"net/url"
@@ -42,6 +43,8 @@ import (
 
 	"github.com/aymerick/douceur/parser"
 )
+
+const genericErrMsg = "bluemonday: %w"
 
 var (
 	dataAttribute             = regexp.MustCompile("^data-.+")
@@ -119,8 +122,8 @@ func parseQuery(query string) (values []Query, err error) {
 		}
 		value := ""
 		hasValue := false
-		if i := strings.Index(key, "="); i >= 0 {
-			key, value = key[:i], key[i+1:]
+		if k, v, ok := strings.Cut(key, "="); ok {
+			key, value = k, v
 			hasValue = true
 		}
 		key, err1 := url.QueryUnescape(key)
@@ -143,7 +146,10 @@ func parseQuery(query string) (values []Query, err error) {
 			HasValue: hasValue,
 		})
 	}
-	return values, err
+	if err != nil {
+		return nil, fmt.Errorf("parse query %q: %w", query, err)
+	}
+	return values, nil
 }
 
 func encodeQueries(queries []Query) string {
@@ -164,14 +170,14 @@ func encodeQueries(queries []Query) string {
 func sanitizedURL(val string) (string, error) {
 	u, err := url.Parse(val)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("bluemonday: parse URL: %w", err)
 	}
 
 	// we use parseQuery but not u.Query to keep the order not change because
 	// url.Values is a map which has a random order.
 	queryValues, err := parseQuery(u.RawQuery)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf(genericErrMsg, err)
 	}
 	// sanitize the url query params
 	for i, query := range queryValues {
@@ -196,7 +202,7 @@ type asStringWriter struct {
 }
 
 func (a *asStringWriter) WriteString(s string) (int, error) {
-	return a.Write([]byte(s))
+	return a.Write([]byte(s)) //nolint:wrapcheck // just a forward
 }
 
 func (p *Policy) sanitize(r io.Reader, w io.Writer) error {
@@ -225,13 +231,12 @@ func (p *Policy) sanitize(r io.Reader, w io.Writer) error {
 	for {
 		if tokenizer.Next() == html.ErrorToken {
 			err := tokenizer.Err()
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				// End of input means end of processing
 				return nil
 			}
-
 			// Raw tokenizer error
-			return err
+			return fmt.Errorf(genericErrMsg, err)
 		}
 
 		token := tokenizer.Token()
@@ -251,7 +256,9 @@ func (p *Policy) sanitize(r io.Reader, w io.Writer) error {
 			// Comments are ignored by default
 			if p.allowComments {
 				// But if allowed then write the comment out as-is
-				buff.WriteString(token.String())
+				if _, err := buff.WriteString(token.String()); err != nil {
+					return fmt.Errorf(genericErrMsg, err)
+				}
 			}
 
 		case html.StartTagToken:
@@ -279,7 +286,7 @@ func (p *Policy) sanitize(r io.Reader, w io.Writer) error {
 					}
 					if p.addSpaces {
 						if _, err := buff.WriteString(" "); err != nil {
-							return err
+							return fmt.Errorf(genericErrMsg, err)
 						}
 					}
 					break
@@ -296,7 +303,7 @@ func (p *Policy) sanitize(r io.Reader, w io.Writer) error {
 					closingTagToSkipStack = append(closingTagToSkipStack, token.Data)
 					if p.addSpaces {
 						if _, err := buff.WriteString(" "); err != nil {
-							return err
+							return fmt.Errorf(genericErrMsg, err)
 						}
 					}
 					break
@@ -305,7 +312,7 @@ func (p *Policy) sanitize(r io.Reader, w io.Writer) error {
 
 			if !skipElementContent {
 				if _, err := buff.WriteString(token.String()); err != nil {
-					return err
+					return fmt.Errorf(genericErrMsg, err)
 				}
 			}
 
@@ -333,7 +340,7 @@ func (p *Policy) sanitize(r io.Reader, w io.Writer) error {
 				}
 				if p.addSpaces {
 					if _, err := buff.WriteString(" "); err != nil {
-						return err
+						return fmt.Errorf(genericErrMsg, err)
 					}
 				}
 				break
@@ -356,7 +363,7 @@ func (p *Policy) sanitize(r io.Reader, w io.Writer) error {
 				if !match {
 					if p.addSpaces {
 						if _, err := buff.WriteString(" "); err != nil {
-							return err
+							return fmt.Errorf(genericErrMsg, err)
 						}
 					}
 					break
@@ -365,7 +372,7 @@ func (p *Policy) sanitize(r io.Reader, w io.Writer) error {
 
 			if !skipElementContent {
 				if _, err := buff.WriteString(token.String()); err != nil {
-					return err
+					return fmt.Errorf(genericErrMsg, err)
 				}
 			}
 
@@ -388,7 +395,7 @@ func (p *Policy) sanitize(r io.Reader, w io.Writer) error {
 				if !matched {
 					if p.addSpaces && !matched {
 						if _, err := buff.WriteString(" "); err != nil {
-							return err
+							return fmt.Errorf(genericErrMsg, err)
 						}
 					}
 					break
@@ -403,14 +410,14 @@ func (p *Policy) sanitize(r io.Reader, w io.Writer) error {
 			if len(token.Attr) == 0 && !p.allowNoAttrs(token.Data) {
 				if p.addSpaces {
 					if _, err := buff.WriteString(" "); err != nil {
-						return err
+						return fmt.Errorf(genericErrMsg, err)
 					}
 				}
 				break
 			}
 			if !skipElementContent {
 				if _, err := buff.WriteString(token.String()); err != nil {
-					return err
+					return fmt.Errorf(genericErrMsg, err)
 				}
 			}
 
@@ -425,7 +432,7 @@ func (p *Policy) sanitize(r io.Reader, w io.Writer) error {
 					// requires p.AllowUnsafe()
 					if p.allowUnsafe {
 						if _, err := buff.WriteString(token.Data); err != nil {
-							return err
+							return fmt.Errorf(genericErrMsg, err)
 						}
 					}
 				case "style":
@@ -435,20 +442,20 @@ func (p *Policy) sanitize(r io.Reader, w io.Writer) error {
 					// requires p.AllowUnsafe()
 					if p.allowUnsafe {
 						if _, err := buff.WriteString(token.Data); err != nil {
-							return err
+							return fmt.Errorf(genericErrMsg, err)
 						}
 					}
 				default:
 					// HTML escape the text
 					if _, err := buff.WriteString(token.String()); err != nil {
-						return err
+						return fmt.Errorf(genericErrMsg, err)
 					}
 				}
 			}
 
 		default:
 			// A token that didn't exist in the html package when we wrote this
-			return fmt.Errorf("unknown token: %v", token)
+			return fmt.Errorf("bluemonday: unknown token: %v", token)
 		}
 	}
 }
@@ -461,7 +468,6 @@ func (p *Policy) sanitizeAttrs(
 	attrs []html.Attribute,
 	aps map[string][]attrPolicy,
 ) []html.Attribute {
-
 	if len(attrs) == 0 {
 		return attrs
 	}
@@ -787,7 +793,7 @@ attrsLoop:
 				sandboxFound = true
 				var cleanVals []string
 				cleanValsSet := make(map[string]bool)
-				for _, val := range strings.Fields(htmlAttr.Val) {
+				for val := range strings.FieldsSeq(htmlAttr.Val) {
 					if p.requireSandboxOnIFrame[val] {
 						if !cleanValsSet[val] {
 							cleanVals = append(cleanVals, val)
@@ -826,10 +832,10 @@ func (p *Policy) sanitizeStyles(attr html.Attribute, elementName string) html.At
 		}
 	}
 
-	//Add semi-colon to end to fix parsing issue
+	// Add semi-colon to end to fix parsing issue
 	attr.Val = strings.TrimRight(attr.Val, " ")
 	if len(attr.Val) > 0 && attr.Val[len(attr.Val)-1] != ';' {
-		attr.Val = attr.Val + ";"
+		attr.Val += ";"
 	}
 	decs, err := parser.ParseDeclarations(attr.Val)
 	if err != nil {
@@ -848,17 +854,18 @@ decLoop:
 		}
 		if spl, ok := sps[tempProperty]; ok {
 			for _, sp := range spl {
-				if sp.handler != nil {
+				switch {
+				case sp.handler != nil:
 					if sp.handler(tempValue) {
 						clean = append(clean, dec.Property+": "+dec.Value)
 						continue decLoop
 					}
-				} else if len(sp.enum) > 0 {
+				case len(sp.enum) > 0:
 					if stringInSlice(tempValue, sp.enum) {
 						clean = append(clean, dec.Property+": "+dec.Value)
 						continue decLoop
 					}
-				} else if sp.regexp != nil {
+				case sp.regexp != nil:
 					if sp.regexp.MatchString(tempValue) {
 						clean = append(clean, dec.Property+": "+dec.Value)
 						continue decLoop
@@ -868,17 +875,18 @@ decLoop:
 		}
 		if spl, ok := p.globalStyles[tempProperty]; ok {
 			for _, sp := range spl {
-				if sp.handler != nil {
+				switch {
+				case sp.handler != nil:
 					if sp.handler(tempValue) {
 						clean = append(clean, dec.Property+": "+dec.Value)
 						continue decLoop
 					}
-				} else if len(sp.enum) > 0 {
+				case len(sp.enum) > 0:
 					if stringInSlice(tempValue, sp.enum) {
 						clean = append(clean, dec.Property+": "+dec.Value)
 						continue decLoop
 					}
-				} else if sp.regexp != nil {
+				case sp.regexp != nil:
 					if sp.regexp.MatchString(tempValue) {
 						clean = append(clean, dec.Property+": "+dec.Value)
 						continue decLoop
@@ -924,17 +932,8 @@ func (p *Policy) validURL(rawurl string) (string, bool) {
 			// Remove \r and \n from base64 encoded data to pass url.Parse.
 			matched := dataURIbase64Prefix.FindString(rawurl)
 			if matched != "" {
-				rawurl = matched + strings.Replace(
-					strings.Replace(
-						rawurl[len(matched):],
-						"\r",
-						"",
-						-1,
-					),
-					"\n",
-					"",
-					-1,
-				)
+				rawurl = matched + strings.ReplaceAll(
+					strings.ReplaceAll(rawurl[len(matched):], "\r", ""), "\n", "")
 			}
 		}
 

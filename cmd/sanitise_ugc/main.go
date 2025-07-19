@@ -6,7 +6,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/microcosm-cc/bluemonday"
+	"github.com/dsh2dsh/bluemonday"
 )
 
 func main() {
@@ -28,10 +28,13 @@ func main() {
 	}
 
 	// Apply the policy and write to stdout
-	fmt.Fprint(
+	_, err = fmt.Fprint(
 		os.Stdout,
 		p.Sanitize(
 			string(dirty),
 		),
 	)
+	if err != nil {
+		log.Fatal(err)
+	}
 }

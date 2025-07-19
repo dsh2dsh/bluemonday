@@ -1,4 +1,9 @@
-# bluemonday [![GoDoc](https://godoc.org/github.com/microcosm-cc/bluemonday?status.png)](https://godoc.org/github.com/microcosm-cc/bluemonday) [![Sourcegraph](https://sourcegraph.com/github.com/microcosm-cc/bluemonday/-/badge.svg)](https://sourcegraph.com/github.com/microcosm-cc/bluemonday?badge)
+# bluemonday
+
+[![Go](https://github.com/dsh2dsh/bluemonday/actions/workflows/go.yml/badge.svg)](https://github.com/dsh2dsh/bluemonday/actions/workflows/go.yml)
+[![GoDoc](https://godoc.org/github.com/dsh2dsh/bluemonday?status.png)](https://godoc.org/github.com/dsh2dsh/bluemonday)
+
+This project is a fork of bluemonday.
 
 bluemonday is a HTML sanitizer implemented in Go. It is fast and highly configurable.
 

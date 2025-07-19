@@ -32,7 +32,6 @@ package bluemonday
 import "testing"
 
 func TestStrictPolicy(t *testing.T) {
-
 	p := StrictPolicy()
 
 	tests := []test{
@@ -66,7 +65,6 @@ func TestStrictPolicy(t *testing.T) {
 }
 
 func TestUGCPolicy(t *testing.T) {
-
 	tests := []test{
 		// Simple formatting
 		{in: "Hello, World!", expected: "Hello, World!"},

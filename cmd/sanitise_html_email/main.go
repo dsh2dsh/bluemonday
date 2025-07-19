@@ -7,7 +7,7 @@ import (
 	"os"
 	"regexp"
 
-	"github.com/microcosm-cc/bluemonday"
+	"github.com/dsh2dsh/bluemonday"
 )
 
 var (
@@ -67,10 +67,13 @@ func main() {
 	}
 
 	// Apply the policy and write to stdout
-	fmt.Fprint(
+	_, err = fmt.Fprint(
 		os.Stdout,
 		p.Sanitize(
 			string(dirty),
 		),
 	)
+	if err != nil {
+		log.Fatal(err)
+	}
 }

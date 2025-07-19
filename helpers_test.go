@@ -320,7 +320,6 @@ func TestRegexpVars(t *testing.T) {
 }
 
 func TestAllowDataURIImages(t *testing.T) {
-
 	p := NewPolicy()
 	p.AllowDataURIImages()
 	p.AllowImages()

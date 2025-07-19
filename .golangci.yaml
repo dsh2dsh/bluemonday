@@ -1,0 +1,134 @@
+version: "2"
+
+run:
+  timeout: "5m"
+  relative-path-mode: "gomod"
+
+formatters:
+  enable:
+    - "gofumpt"
+    - "goimports"
+
+  settings:
+    goimports:
+      # A list of prefixes, which, if set, checks import paths
+      # with the given prefixes are grouped after 3rd-party packages.
+      # Default: []
+      local-prefixes:
+        - "github.com/dsh2dsh/bluemonday"
+
+linters:
+  enable:
+    - "asciicheck"
+    - "bidichk"
+    - "bodyclose"
+    - "copyloopvar"
+    - "embeddedstructfieldcheck"
+    - "errorlint"
+    - "gocritic"
+    - "makezero"
+    - "misspell"
+    - "nilnesserr"
+    - "nolintlint"
+    - "perfsprint"
+    - "prealloc"
+    - "predeclared"
+    - "sloglint"
+    - "sqlclosecheck"
+    - "testifylint"
+    - "unconvert"
+    - "usestdlibvars"
+    - "usetesting"
+    - "wastedassign"
+    - "wrapcheck"
+
+  settings:
+    errcheck:
+      exclude-functions:
+        # List of functions to exclude from checking, where each entry is a
+        # single function to exclude. See
+        # https://github.com/kisielk/errcheck#excluding-functions for details.
+        - "io/ioutil.ReadFile"
+        - "io.Copy(*bytes.Buffer)"
+        - "io.Copy(os.Stdout)"
+        - "(*compress/flate.Writer).Close"
+        - "(*compress/gzip.Writer).Close"
+        - "(*database/sql.DB).Close"
+        - "(*database/sql.Rows).Close"
+        - "(*database/sql.Tx).Rollback"
+        - "(io.Closer).Close"
+        - "(mime/multipart.File).Close"
+        - "(net.Conn).Close"
+        - "(net.Listener).Close"
+        - "(*os.File).Close"
+        - "(io/fs.File).Close"
+        - "golang.org/x/term.Restore"
+        - "(*github.com/andybalholm/brotli/matchfinder.Writer).Close"
+
+      # Display function signature instead of selector.
+      # Default: false
+      verbose: true
+
+    errorlint:
+      allowed-errors:
+        - err: "io.EOF"
+          fun: "io.ReadAll"
+
+    nolintlint:
+      # Enable to require an explanation of nonzero length after each nolint
+      # directive.
+      # Default: false
+      require-explanation: true
+      # Enable to require nolint directives to mention the specific linter being
+      # suppressed.
+      # Default: false
+      require-specific: true
+
+    sloglint:
+      # Enforce using attributes only (overrides no-mixed-args, incompatible with kv-only).
+      # https://github.com/go-simpler/sloglint?tab=readme-ov-file#attributes-only
+      # Default: false
+      attr-only: true
+
+    staticcheck:
+      # SAxxxx checks in https://staticcheck.dev/docs/configuration/options/#checks
+      # Example (to disable some checks): [ "all", "-SA1000", "-SA1001"]
+      # Default: ["all", "-ST1000", "-ST1003", "-ST1016", "-ST1020", "-ST1021", "-ST1022"]
+      checks:
+        - "all"
+        - "-ST1000"
+        - "-ST1003"
+        # Poorly chosen receiver name
+        # https://staticcheck.dev/docs/checks/#ST1006
+        - "-ST1006"
+        # ST1011 - Poorly chosen name for variable of type time.Duration
+        # https://staticcheck.dev/docs/checks/#ST1011
+        - "-ST1011"
+        - "-ST1016"
+        - "-ST1020"
+        - "-ST1021"
+        - "-ST1022"
+
+    usetesting:
+      # Enable/disable `os.Setenv()` detections.
+      # Default: false
+      os-setenv: true
+
+      # Enable/disable `os.TempDir()` detections.
+      # Default: false
+      os-temp-dir: true
+
+    wrapcheck:
+      # An array of glob patterns which, if any match the package of the function
+      # returning the error, will skip wrapcheck analysis for this error. This is
+      # useful for broadly ignoring packages and/or subpackages from wrapcheck
+      # analysis. There are no defaults for this value.
+      ignore-package-globs:
+       - "github.com/dsh2dsh/bluemonday/*"
+
+  exclusions:
+    rules:
+      - path: '_test\.go'
+        linters:
+          - "errcheck"
+          - "wrapcheck"

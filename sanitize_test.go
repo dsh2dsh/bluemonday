@@ -71,7 +71,6 @@ func TestSignatureBehaviour(t *testing.T) {
 	if output := p.SanitizeReader(
 		strings.NewReader(input),
 	).String(); output != input {
-
 		t.Errorf(`SanitizeReader() input = %s, output = %s`, input, output)
 	}
 
@@ -88,13 +87,11 @@ func TestSignatureBehaviour(t *testing.T) {
 	if output := p.SanitizeReader(
 		strings.NewReader(input),
 	).String(); output != input {
-
 		t.Errorf(`SanitizeReader() input = %s, output = %s`, input, output)
 	}
 }
 
 func TestLinks(t *testing.T) {
-
 	tests := []test{
 		{
 			in:       `<a href="http://www.google.com">`,
@@ -195,7 +192,6 @@ func TestLinks(t *testing.T) {
 }
 
 func TestLinkTargets(t *testing.T) {
-
 	tests := []test{
 		{
 			in:       `<a href="http://www.google.com">`,
@@ -268,7 +264,6 @@ func TestLinkTargets(t *testing.T) {
 }
 
 func TestStyling(t *testing.T) {
-
 	tests := []test{
 		{
 			in:       `<span class="foo">Hello World</span>`,
@@ -306,7 +301,6 @@ func TestStyling(t *testing.T) {
 }
 
 func TestEmptyAttributes(t *testing.T) {
-
 	p := UGCPolicy()
 	// Do not do this, especially without a Matching() clause, this is a test
 	p.AllowAttrs("disabled").OnElements("textarea")
@@ -352,7 +346,6 @@ func TestEmptyAttributes(t *testing.T) {
 }
 
 func TestDataAttributes(t *testing.T) {
-
 	p := UGCPolicy()
 	p.AllowDataAttributes()
 
@@ -390,7 +383,6 @@ func TestDataAttributes(t *testing.T) {
 }
 
 func TestDataUri(t *testing.T) {
-
 	p := UGCPolicy()
 	p.AllowURLSchemeWithCustomPolicy(
 		"data",
@@ -444,7 +436,6 @@ func TestDataUri(t *testing.T) {
 }
 
 func TestGlobalURLPatternsViaCustomPolicy(t *testing.T) {
-
 	p := UGCPolicy()
 	// youtube embeds
 	p.AllowElements("iframe")
@@ -489,7 +480,6 @@ func TestGlobalURLPatternsViaCustomPolicy(t *testing.T) {
 }
 
 func TestELementURLPatternsMatching(t *testing.T) {
-
 	p := UGCPolicy()
 	// youtube embeds
 	p.AllowElements("iframe")
@@ -524,7 +514,6 @@ func TestELementURLPatternsMatching(t *testing.T) {
 }
 
 func TestAntiSamy(t *testing.T) {
-
 	standardUrls := regexp.MustCompile(`(?i)^https?|mailto`)
 
 	p := NewPolicy()
@@ -892,7 +881,6 @@ func TestAntiSamy(t *testing.T) {
 }
 
 func TestXSS(t *testing.T) {
-
 	p := UGCPolicy()
 
 	tests := []test{
@@ -1647,7 +1635,6 @@ func TestComments(t *testing.T) {
 }
 
 func TestDefaultStyleHandlers(t *testing.T) {
-
 	tests := []test{
 		{
 			in:       `<div style="nonexistentStyle: something;"></div>`,
@@ -2779,7 +2766,6 @@ func TestDefaultStyleHandlers(t *testing.T) {
 }
 
 func TestUnicodePoints(t *testing.T) {
-
 	tests := []test{
 		{
 			in:       `<div style="color: \72 ed;"></div>`,
@@ -3335,8 +3321,8 @@ func TestIssue3(t *testing.T) {
 	}
 	wg.Wait()
 }
-func TestIssue9(t *testing.T) {
 
+func TestIssue9(t *testing.T) {
 	p := UGCPolicy()
 	p.AllowAttrs("class").Matching(SpaceSeparatedTokens).OnElements("div", "span")
 	p.AllowAttrs("class", "name").Matching(SpaceSeparatedTokens).OnElements("a")

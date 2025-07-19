@@ -250,7 +250,8 @@ var (
 		"writing-mode":               WritingModeHandler,
 		"z-index":                    ZIndexHandler,
 	}
-	colorValues = []string{"transparent", "initial", "inherit", "aliceblue",
+	colorValues = []string{
+		"transparent", "initial", "inherit", "aliceblue",
 		"antiquewhite", "aqua", "aquamarine", "azure", "beige", "bisque",
 		"black", "blanchedalmond", "blue", "blueviolet", "brown", "burlywood",
 		"cadetblue", "chartreuse", "chocolate", "coral", "cornflowerblue",
@@ -279,7 +280,8 @@ var (
 		"seagreen", "seashell", "sienna", "silver", "skyblue", "slateblue",
 		"slategray", "slategrey", "snow", "springgreen", "steelblue", "tan",
 		"teal", "thistle", "tomato", "turquoise", "violet", "wheat", "white",
-		"whitesmoke", "yellow", "yellowgreen"}
+		"whitesmoke", "yellow", "yellowgreen",
+	}
 
 	Alpha             = regexp.MustCompile(`^[a-z]+$`)
 	Blur              = regexp.MustCompile(`^blur\([0-9]+px\)$`)
@@ -338,7 +340,7 @@ func multiSplit(value string, seps ...string) []string {
 }
 
 func recursiveCheck(value []string, funcs []func(string) bool) bool {
-	for i := 0; i < len(value); i++ {
+	for i := range len(value) {
 		tempVal := strings.Join(value[:i+1], " ")
 		for _, j := range funcs {
 			if j(tempVal) && (len(value[i+1:]) == 0 || recursiveCheck(value[i+1:], funcs)) {
@@ -374,7 +376,6 @@ func splitValues(value string) []string {
 }
 
 func GetDefaultHandler(attr string) func(string) bool {
-
 	if defaultStyleHandlers[attr] != nil {
 		return defaultStyleHandlers[attr]
 	}
@@ -386,22 +387,28 @@ func BaseHandler(value string) bool {
 }
 
 func AlignContentHandler(value string) bool {
-	values := []string{"stretch", "center", "flex-start",
-		"flex-end", "space-between", "space-around", "initial", "inherit"}
+	values := []string{
+		"stretch", "center", "flex-start",
+		"flex-end", "space-between", "space-around", "initial", "inherit",
+	}
 	splitVals := splitValues(value)
 	return in(splitVals, values)
 }
 
 func AlignItemsHandler(value string) bool {
-	values := []string{"stretch", "center", "flex-start",
-		"flex-end", "baseline", "initial", "inherit"}
+	values := []string{
+		"stretch", "center", "flex-start",
+		"flex-end", "baseline", "initial", "inherit",
+	}
 	splitVals := splitValues(value)
 	return in(splitVals, values)
 }
 
 func AlignSelfHandler(value string) bool {
-	values := []string{"auto", "stretch", "center", "flex-start",
-		"flex-end", "baseline", "initial", "inherit"}
+	values := []string{
+		"auto", "stretch", "center", "flex-start",
+		"flex-end", "baseline", "initial", "inherit",
+	}
 	splitVals := splitValues(value)
 	return in(splitVals, values)
 }
@@ -538,8 +545,10 @@ func BackgroundClipHandler(value string) bool {
 }
 
 func BackgroundBlendModeHandler(value string) bool {
-	values := []string{"normal", "multiply", "screen", "overlay", "darken",
-		"lighten", "color-dodge", "saturation", "color", "luminosity"}
+	values := []string{
+		"normal", "multiply", "screen", "overlay", "darken",
+		"lighten", "color-dodge", "saturation", "color", "luminosity",
+	}
 	splitVals := splitValues(value)
 	return in(splitVals, values)
 }
@@ -789,8 +798,7 @@ func BoxShadowHandler(value string) bool {
 	if in([]string{value}, values) {
 		return true
 	}
-	commaSplitVals := strings.Split(value, ",")
-	for _, val := range commaSplitVals {
+	for val := range strings.SplitSeq(value, ",") {
 		splitVals := strings.Split(val, " ")
 		if len(splitVals) > 6 || len(splitVals) < 2 {
 			return false
@@ -1785,8 +1793,7 @@ func TextShadowHandler(value string) bool {
 	if in([]string{value}, values) {
 		return true
 	}
-	commaSplitVals := strings.Split(value, ",")
-	for _, val := range commaSplitVals {
+	for val := range strings.SplitSeq(value, ",") {
 		splitVals := strings.Split(val, " ")
 		if len(splitVals) > 6 || len(splitVals) < 2 {
 			return false
@@ -1869,23 +1876,28 @@ func TransformOriginHandler(value string) bool {
 	splitVals := strings.Split(value, " ")
 	xValues := []string{"left", "center", "right"}
 	yValues := []string{"top", "center", "bottom"}
-	if len(splitVals) > 2 {
-		if !in([]string{splitVals[0]}, xValues) && !LengthHandler(splitVals[0]) {
-			return false
-		}
-		if !in([]string{splitVals[1]}, yValues) && !LengthHandler(splitVals[1]) {
-			return false
-		}
-		return LengthHandler(splitVals[2])
-	} else if len(splitVals) > 1 {
+
+	switch len(splitVals) {
+	case 0:
+		return false
+	case 1:
+		return in(splitVals, xValues) || in(splitVals, yValues) ||
+			LengthHandler(splitVals[0])
+	case 2:
 		if !in([]string{splitVals[0]}, xValues) && !LengthHandler(splitVals[0]) {
 			return false
 		}
 		return in([]string{splitVals[1]}, yValues) || LengthHandler(splitVals[1])
-	} else if len(splitVals) == 1 {
-		return in(splitVals, xValues) || in(splitVals, yValues) || LengthHandler(splitVals[0])
 	}
-	return false
+
+	// len(splitVals) > 2
+	if !in([]string{splitVals[0]}, xValues) && !LengthHandler(splitVals[0]) {
+		return false
+	}
+	if !in([]string{splitVals[1]}, yValues) && !LengthHandler(splitVals[1]) {
+		return false
+	}
+	return LengthHandler(splitVals[2])
 }
 
 func TransformStyleHandler(value string) bool {

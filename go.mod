@@ -1,6 +1,6 @@
-module github.com/microcosm-cc/bluemonday
+module github.com/dsh2dsh/bluemonday
 
-go 1.19
+go 1.24
 
 require (
 	github.com/aymerick/douceur v0.2.0
