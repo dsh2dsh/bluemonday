@@ -98,14 +98,14 @@ func (p *Policy) SanitizeReaderToWriter(r io.Reader, w io.Writer) error {
 	return p.sanitize(r, w)
 }
 
-// Query represents a single part of the query string, a query param
-type Query struct {
+// queryItem represents a single part of the query string, a query param
+type queryItem struct {
 	Key      string
 	Value    string
 	HasValue bool
 }
 
-func parseQuery(query string) (values []Query, err error) {
+func parseQuery(query string) (values []queryItem, err error) {
 	// This is essentially a copy of parseQuery from
 	// https://golang.org/src/net/url/url.go but adjusted to build our values
 	// based on our type, which we need to preserve the ordering of the query
@@ -140,7 +140,7 @@ func parseQuery(query string) (values []Query, err error) {
 			}
 			continue
 		}
-		values = append(values, Query{
+		values = append(values, queryItem{
 			Key:      key,
 			Value:    value,
 			HasValue: hasValue,
@@ -152,7 +152,7 @@ func parseQuery(query string) (values []Query, err error) {
 	return values, nil
 }
 
-func encodeQueries(queries []Query) string {
+func encodeQueries(queries []queryItem) string {
 	var buff bytes.Buffer
 	for i, query := range queries {
 		buff.WriteString(url.QueryEscape(query.Key))
