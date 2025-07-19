@@ -184,7 +184,7 @@ type stylePolicy struct {
 	enum []string
 }
 
-type attrPolicyBuilder struct {
+type AttrPolicyBuilder struct {
 	p *Policy
 
 	attrNames  []string
@@ -260,10 +260,10 @@ func NewPolicy() *Policy {
 //
 // The attribute policy is only added to the core policy when either Globally()
 // or OnElements(...) are called.
-func (p *Policy) AllowAttrs(attrNames ...string) *attrPolicyBuilder {
+func (p *Policy) AllowAttrs(attrNames ...string) *AttrPolicyBuilder {
 	p.init()
 
-	abp := attrPolicyBuilder{
+	abp := AttrPolicyBuilder{
 		p:          p,
 		allowEmpty: false,
 	}
@@ -310,10 +310,10 @@ func (p *Policy) AllowComments() {
 //
 // The attribute policy is only added to the core policy when OnElements(...)
 // are called.
-func (p *Policy) AllowNoAttrs() *attrPolicyBuilder {
+func (p *Policy) AllowNoAttrs() *AttrPolicyBuilder {
 	p.init()
 
-	abp := attrPolicyBuilder{
+	abp := AttrPolicyBuilder{
 		p:          p,
 		allowEmpty: true,
 	}
@@ -324,7 +324,7 @@ func (p *Policy) AllowNoAttrs() *attrPolicyBuilder {
 //
 // The attribute policy is only added to the core policy when OnElements(...)
 // are called.
-func (abp *attrPolicyBuilder) AllowNoAttrs() *attrPolicyBuilder {
+func (abp *AttrPolicyBuilder) AllowNoAttrs() *AttrPolicyBuilder {
 	abp.allowEmpty = true
 
 	return abp
@@ -332,7 +332,7 @@ func (abp *attrPolicyBuilder) AllowNoAttrs() *attrPolicyBuilder {
 
 // Matching allows a regular expression to be applied to a nascent attribute
 // policy, and returns the attribute policy.
-func (abp *attrPolicyBuilder) Matching(regex *regexp.Regexp) *attrPolicyBuilder {
+func (abp *AttrPolicyBuilder) Matching(regex *regexp.Regexp) *AttrPolicyBuilder {
 	abp.regexp = regex
 
 	return abp
@@ -340,7 +340,7 @@ func (abp *attrPolicyBuilder) Matching(regex *regexp.Regexp) *attrPolicyBuilder 
 
 // OnElements will bind an attribute policy to a given range of HTML elements
 // and return the updated policy
-func (abp *attrPolicyBuilder) OnElements(elements ...string) *Policy {
+func (abp *AttrPolicyBuilder) OnElements(elements ...string) *Policy {
 	for _, element := range elements {
 		element = strings.ToLower(element)
 
@@ -372,7 +372,7 @@ func (abp *attrPolicyBuilder) OnElements(elements ...string) *Policy {
 
 // OnElementsMatching will bind an attribute policy to all elements matching a given regex
 // and return the updated policy
-func (abp *attrPolicyBuilder) OnElementsMatching(regex *regexp.Regexp) *Policy {
+func (abp *AttrPolicyBuilder) OnElementsMatching(regex *regexp.Regexp) *Policy {
 	for _, attr := range abp.attrNames {
 		if _, ok := abp.p.elsMatchingAndAttrs[regex]; !ok {
 			abp.p.elsMatchingAndAttrs[regex] = make(map[string][]attrPolicy)
@@ -396,7 +396,7 @@ func (abp *attrPolicyBuilder) OnElementsMatching(regex *regexp.Regexp) *Policy {
 
 // Globally will bind an attribute policy to all HTML elements and return the
 // updated policy
-func (abp *attrPolicyBuilder) Globally() *Policy {
+func (abp *AttrPolicyBuilder) Globally() *Policy {
 	for _, attr := range abp.attrNames {
 		if _, ok := abp.p.globalAttrs[attr]; !ok {
 			abp.p.globalAttrs[attr] = []attrPolicy{}
