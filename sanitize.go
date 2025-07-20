@@ -587,20 +587,19 @@ attrsLoop:
 					}
 					tmpAttrs = append(tmpAttrs, htmlAttr)
 				case "audio", "embed", "iframe", "img", "script", "source", "track", "video":
-					if htmlAttr.Key == "src" {
-						if u, ok := p.validURL(htmlAttr.Val); ok {
-							if p.srcRewriter != nil {
-								parsedURL, err := url.Parse(u)
-								if err != nil {
-									fmt.Println(err)
-								}
-								p.srcRewriter(parsedURL)
-								u = parsedURL.String()
-							}
-							htmlAttr.Val = u
-							tmpAttrs = append(tmpAttrs, htmlAttr)
+					switch htmlAttr.Key {
+					case "src":
+						u, ok := p.validURL(htmlAttr.Val)
+						if !ok {
+							continue
 						}
-						break
+						htmlAttr.Val = p.rewriteSrc(u)
+					case "poster":
+						u, ok := p.validURL(htmlAttr.Val)
+						if !ok {
+							continue
+						}
+						htmlAttr.Val = u
 					}
 					tmpAttrs = append(tmpAttrs, htmlAttr)
 				default:
@@ -986,6 +985,20 @@ func (p *Policy) rewriteURL(u *url.URL) string {
 	return u.String()
 }
 
+func (p *Policy) rewriteSrc(src string) string {
+	if p.srcRewriter == nil {
+		return src
+	}
+
+	u, err := url.Parse(src)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	p.srcRewriter(u)
+	return u.String()
+}
+
 func linkable(elementName string) bool {
 	switch elementName {
 	case "a", "area", "base", "link":
@@ -994,7 +1007,7 @@ func linkable(elementName string) bool {
 	case "blockquote", "del", "ins", "q":
 		// elements that allow .cite
 		return true
-	case "audio", "embed", "iframe", "img", "input", "script", "track", "video":
+	case "audio", "embed", "iframe", "img", "input", "script", "source", "track", "video":
 		// elements that allow .src
 		return true
 	default:

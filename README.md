@@ -25,6 +25,12 @@ This project is a fork of bluemonday. Changes from
   })
   ```
 
+* Handle more properties as URLs
+
+  * `<video poster="">`
+
+  * `<source src="">`
+
 bluemonday is a HTML sanitizer implemented in Go. It is fast and highly configurable.
 
 bluemonday takes untrusted user generated content as an input, and will return HTML that has been sanitised against an allowlist of approved HTML elements and attributes so that you can safely include the content in your web page.

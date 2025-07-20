@@ -157,10 +157,19 @@ func TestLinks(t *testing.T) {
 			in:       `<img src="giraffe.gif?height=500&amp;width=500&amp;flag" />`,
 			expected: `<img src="https://proxy.example.com/?u=giraffe.gif?height=500&amp;width=500&amp;flag"/>`,
 		},
+		{
+			in:       `<video src="giraffe.gif" />`,
+			expected: `<video src="https://proxy.example.com/?u=giraffe.gif"/>`,
+		},
+		{
+			in:       `<source src="giraffe.gif" />`,
+			expected: `<source src="https://proxy.example.com/?u=giraffe.gif"/>`,
+		},
 	}
 
 	p := UGCPolicy()
 	p.RequireParseableURLs(true)
+	p.AllowAttrs("src").OnElements("video", "source")
 	p.RewriteSrc(func(u *url.URL) {
 		// Proxify all requests to "https://proxy.example.com/?u=http://example.com/"
 		// This is a contrived example, but it shows how to rewrite URLs
@@ -4187,6 +4196,11 @@ func TestRewriteURL(t *testing.T) {
 			in:       `<a href="/page2.html">`,
 			expected: `<a href="https://example.com/page2.html" rel="nofollow noreferrer noopener" target="_blank">`,
 		},
+		{
+			name:     "video poster",
+			in:       `<video poster="giraffe.gif" />`,
+			expected: `<video poster="https://example.com/giraffe.gif"/>`,
+		},
 	}
 
 	pageURL, err := url.Parse("https://example.com/page.html")
@@ -4195,6 +4209,8 @@ func TestRewriteURL(t *testing.T) {
 	p := UGCPolicy().
 		RequireNoReferrerOnLinks(true).
 		AddTargetBlankToFullyQualifiedLinks(true)
+
+	p.AllowAttrs("poster").OnElements("video")
 
 	p.RewriteURL(func(u *url.URL) {
 		if u.IsAbs() {
