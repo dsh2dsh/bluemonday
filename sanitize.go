@@ -267,11 +267,7 @@ func (p *Policy) sanitize(r io.Reader, w io.Writer) error {
 
 			mostRecentlyStartedToken = normaliseElementName(token.Data)
 			switch mostRecentlyStartedToken {
-			case `script`:
-				if !p.allowUnsafe {
-					continue
-				}
-			case `style`:
+			case "script", "style":
 				if !p.allowUnsafe {
 					continue
 				}
@@ -315,6 +311,13 @@ func (p *Policy) sanitize(r io.Reader, w io.Writer) error {
 				if _, err := buff.WriteString(token.String()); err != nil {
 					return fmt.Errorf(genericErrMsg, err)
 				}
+				switch mostRecentlyStartedToken {
+				case "script", "style":
+				default:
+					if _, ok := p.setOfElementsToSkipContent[token.Data]; ok {
+						skipElementContent = true
+					}
+				}
 			}
 
 		case html.EndTagToken:
@@ -324,12 +327,7 @@ func (p *Policy) sanitize(r io.Reader, w io.Writer) error {
 				mostRecentlyStartedToken = ""
 			}
 
-			switch elementName {
-			case `script`:
-				if !p.allowUnsafe {
-					continue
-				}
-			case `style`:
+			if elementName == "script" || elementName == "style" {
 				if !p.allowUnsafe {
 					continue
 				}
@@ -372,6 +370,15 @@ func (p *Policy) sanitize(r io.Reader, w io.Writer) error {
 				}
 			}
 
+			switch elementName {
+			case "script", "style":
+			default:
+				_, ok := p.setOfElementsToSkipContent[token.Data]
+				if skipElementContent && ok {
+					skipElementContent = false
+				}
+			}
+
 			if !skipElementContent {
 				if _, err := buff.WriteString(token.String()); err != nil {
 					return fmt.Errorf(genericErrMsg, err)
@@ -381,11 +388,7 @@ func (p *Policy) sanitize(r io.Reader, w io.Writer) error {
 		case html.SelfClosingTagToken:
 
 			switch normaliseElementName(token.Data) {
-			case `script`:
-				if !p.allowUnsafe {
-					continue
-				}
-			case `style`:
+			case "script", "style":
 				if !p.allowUnsafe {
 					continue
 				}
@@ -427,18 +430,8 @@ func (p *Policy) sanitize(r io.Reader, w io.Writer) error {
 
 			if !skipElementContent {
 				switch mostRecentlyStartedToken {
-				case `script`:
-					// not encouraged, but if a policy allows JavaScript we
-					// should not HTML escape it as that would break the output
-					//
-					// requires p.AllowUnsafe()
-					if p.allowUnsafe {
-						if _, err := buff.WriteString(token.Data); err != nil {
-							return fmt.Errorf(genericErrMsg, err)
-						}
-					}
-				case "style":
-					// not encouraged, but if a policy allows CSS styles we
+				case "script", "style":
+					// not encouraged, but if a policy allows JavaScript or CSS styles we
 					// should not HTML escape it as that would break the output
 					//
 					// requires p.AllowUnsafe()

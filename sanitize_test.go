@@ -1283,31 +1283,39 @@ func TestAllowNoAttrs(t *testing.T) {
 }
 
 func TestSkipElementsContent(t *testing.T) {
-	input := "<tag>test</tag>"
-	outputFail := "test"
-	outputOk := ""
-
 	p := NewPolicy()
-
-	if output := p.Sanitize(input); output != outputFail {
-		t.Errorf(
-			"test failed;\ninput   : %s\noutput  : %s\nexpected: %s",
-			input,
-			output,
-			outputFail,
-		)
-	}
+	input := "<tag>test</tag>"
+	assert.Equal(t, "test", p.Sanitize(input))
 
 	p.SkipElementsContent("tag")
+	assert.Empty(t, p.Sanitize(input))
 
-	if output := p.Sanitize(input); output != outputOk {
-		t.Errorf(
-			"test failed;\ninput   : %s\noutput  : %s\nexpected: %s",
-			input,
-			output,
-			outputOk,
-		)
-	}
+	p.AllowNoAttrs().OnElements("tag")
+	assert.Equal(t, "<tag></tag>", p.Sanitize(input))
+
+	p.AllowElementsContent("tag")
+	assert.Equal(t, input, p.Sanitize(input))
+
+	input2 := "<tag><p>test</p></tag>"
+	assert.Equal(t, input, p.Sanitize(input2))
+
+	input = input2
+	p.AllowElements("p")
+	assert.Equal(t, input, p.Sanitize(input))
+
+	p.SkipElementsContent("tag")
+	assert.Equal(t, "<tag></tag>", p.Sanitize(input))
+
+	input = `<iframe src="https://www.youtube.com/"><p>test</p></iframe>`
+	p.AllowAttrs("src").OnElements("iframe")
+	assert.Equal(t,
+		`<iframe src="https://www.youtube.com/"></iframe>`,
+		p.Sanitize(input))
+
+	p.AllowElementsContent("iframe")
+	assert.Equal(t,
+		`<iframe src="https://www.youtube.com/">&lt;p&gt;test&lt;/p&gt;</iframe>`,
+		p.Sanitize(input))
 }
 
 func TestTagSkipClosingTagNested(t *testing.T) {

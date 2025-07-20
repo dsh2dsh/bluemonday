@@ -31,6 +31,11 @@ This project is a fork of bluemonday. Changes from
 
   * `<source src="">`
 
+* Optionally remove content of specific allowed HTML elements
+
+  For allowed HTML elements `SkipElementsContent` marks their content is needed
+  to be removed.
+
 bluemonday is a HTML sanitizer implemented in Go. It is fast and highly configurable.
 
 bluemonday takes untrusted user generated content as an input, and will return HTML that has been sanitised against an allowlist of approved HTML elements and attributes so that you can safely include the content in your web page.
