@@ -4234,3 +4234,25 @@ func TestRewriteURL(t *testing.T) {
 		})
 	}
 }
+
+func TestWithValues(t *testing.T) {
+	p := NewPolicy()
+
+	p.AllowAttrs("one").WithValues("two").OnElements("tag")
+	input := `<tag one="two">test</tag>`
+	assert.Equal(t, input, p.Sanitize(input))
+
+	input = `<tag one="TWO">test</tag>`
+	assert.Equal(t, input, p.Sanitize(input))
+
+	input = `<tag one="three">test</tag>`
+	assert.Equal(t, "test", p.Sanitize(input))
+
+	p.AllowAttrs("one").WithValues("two", "three").OnElements("tag")
+	input = `<tag one="three">test</tag>`
+	assert.Equal(t, input, p.Sanitize(input))
+
+	p.AllowAttrs("one").WithValues("two", "three", "four").OnElements("tag")
+	input = `<tag one="four">test</tag>`
+	assert.Equal(t, input, p.Sanitize(input))
+}

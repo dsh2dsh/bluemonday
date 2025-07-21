@@ -40,21 +40,22 @@ import (
 var (
 	// CellAlign handles the `align` attribute
 	// https://developer.mozilla.org/en-US/docs/Web/HTML/Element/td#attr-align
-	CellAlign = regexp.MustCompile(`(?i)^(center|justify|left|right|char)$`)
+	CellAlign = [...]string{"center", "justify", "left", "right", "char"}
 
 	// CellVerticalAlign handles the `valign` attribute
 	// https://developer.mozilla.org/en-US/docs/Web/HTML/Element/td#attr-valign
-	CellVerticalAlign = regexp.MustCompile(`(?i)^(baseline|bottom|middle|top)$`)
+	CellVerticalAlign = [...]string{"baseline", "bottom", "middle", "top"}
 
 	// Direction handles the `dir` attribute
 	// https://developer.mozilla.org/en-US/docs/Web/HTML/Element/bdo#attr-dir
-	Direction = regexp.MustCompile(`(?i)^(rtl|ltr)$`)
+	Direction = [...]string{"rtl", "ltr"}
 
 	// ImageAlign handles the `align` attribute on the `image` tag
 	// http://www.w3.org/MarkUp/Test/Img/imgtest.html
-	ImageAlign = regexp.MustCompile(
-		`(?i)^(left|right|top|texttop|middle|absmiddle|baseline|bottom|absbottom)$`,
-	)
+	ImageAlign = [...]string{
+		"left", "right", "top", "texttop", "middle", "absmiddle", "baseline",
+		"bottom", "absbottom",
+	}
 
 	// Integer describes whole positive integers (including 0) used in places
 	// like td.colspan
@@ -89,7 +90,7 @@ var (
 	// ListType encapsulates the common value as well as the latest spec
 	// values for lists
 	// https://developer.mozilla.org/en-US/docs/Web/HTML/Element/ol#attr-type
-	ListType = regexp.MustCompile(`(?i)^(circle|disc|square|a|A|i|I|1)$`)
+	ListType = [...]string{"circle", "disc", "square", "a", "i", "1"}
 
 	// SpaceSeparatedTokens is used in places like `a.rel` and the common attribute
 	// `class` which both contain space delimited lists of data tokens
@@ -145,7 +146,7 @@ func (p *Policy) AllowStandardURLs() {
 func (p *Policy) AllowStandardAttributes() {
 	// "dir" "lang" are permitted as both language attributes affect charsets
 	// and direction of text.
-	p.AllowAttrs("dir").Matching(Direction).Globally()
+	p.AllowAttrs("dir").WithValues(Direction[:]...).Globally()
 	p.AllowAttrs(
 		"lang",
 	).Matching(regexp.MustCompile(`^[a-zA-Z]{2,20}$`)).Globally()
@@ -177,7 +178,7 @@ func (p *Policy) AllowStyling() {
 // images, for that you should also use the AllowDataURIImages() helper.
 func (p *Policy) AllowImages() {
 	// "img" is permitted
-	p.AllowAttrs("align").Matching(ImageAlign).OnElements("img")
+	p.AllowAttrs("align").WithValues(ImageAlign[:]...).OnElements("img")
 	p.AllowAttrs("alt").Matching(Paragraph).OnElements("img")
 	p.AllowAttrs("height", "width").Matching(NumberOrPercent).OnElements("img")
 
@@ -228,10 +229,10 @@ func (p *Policy) AllowDataURIImages() {
 // lists
 func (p *Policy) AllowLists() {
 	// "ol" "ul" are permitted
-	p.AllowAttrs("type").Matching(ListType).OnElements("ol", "ul")
+	p.AllowAttrs("type").WithValues(ListType[:]...).OnElements("ol", "ul")
 
 	// "li" is permitted
-	p.AllowAttrs("type").Matching(ListType).OnElements("li")
+	p.AllowAttrs("type").WithValues(ListType[:]...).OnElements("li")
 	p.AllowAttrs("value").Matching(Integer).OnElements("li")
 
 	// "dl" "dt" "dd" are permitted
@@ -249,22 +250,23 @@ func (p *Policy) AllowTables() {
 	p.AllowElements("caption")
 
 	// "col" "colgroup" are permitted
-	p.AllowAttrs("align").Matching(CellAlign).OnElements("col", "colgroup")
+	p.AllowAttrs("align").WithValues(CellAlign[:]...).
+		OnElements("col", "colgroup")
 	p.AllowAttrs("height", "width").Matching(
 		NumberOrPercent,
 	).OnElements("col", "colgroup")
 	p.AllowAttrs("span").Matching(Integer).OnElements("colgroup", "col")
-	p.AllowAttrs("valign").Matching(
-		CellVerticalAlign,
-	).OnElements("col", "colgroup")
+	p.AllowAttrs("valign").WithValues(CellVerticalAlign[:]...).
+		OnElements("col", "colgroup")
 
 	// "thead" "tr" are permitted
-	p.AllowAttrs("align").Matching(CellAlign).OnElements("thead", "tr")
-	p.AllowAttrs("valign").Matching(CellVerticalAlign).OnElements("thead", "tr")
+	p.AllowAttrs("align").WithValues(CellAlign[:]...).OnElements("thead", "tr")
+	p.AllowAttrs("valign").WithValues(CellVerticalAlign[:]...).
+		OnElements("thead", "tr")
 
 	// "td" "th" are permitted
 	p.AllowAttrs("abbr").Matching(Paragraph).OnElements("td", "th")
-	p.AllowAttrs("align").Matching(CellAlign).OnElements("td", "th")
+	p.AllowAttrs("align").WithValues(CellAlign[:]...).OnElements("td", "th")
 	p.AllowAttrs("colspan", "rowspan").Matching(Integer).OnElements("td", "th")
 	p.AllowAttrs("headers").Matching(
 		SpaceSeparatedTokens,
@@ -274,19 +276,19 @@ func (p *Policy) AllowTables() {
 	).OnElements("td", "th")
 	p.AllowAttrs(
 		"scope",
-	).Matching(
-		regexp.MustCompile(`(?i)(?:row|col)(?:group)?`),
+	).WithValues(
+		"row", "col", "rowgroup", "colgroup",
 	).OnElements("td", "th")
-	p.AllowAttrs("valign").Matching(CellVerticalAlign).OnElements("td", "th")
-	p.AllowAttrs("nowrap").Matching(
-		regexp.MustCompile(`(?i)|nowrap`),
+	p.AllowAttrs("valign").WithValues(CellVerticalAlign[:]...).
+		OnElements("td", "th")
+	p.AllowAttrs("nowrap").WithValues(
+		"", "nowrap",
 	).OnElements("td", "th")
 
 	// "tbody" "tfoot"
-	p.AllowAttrs("align").Matching(CellAlign).OnElements("tbody", "tfoot")
-	p.AllowAttrs("valign").Matching(
-		CellVerticalAlign,
-	).OnElements("tbody", "tfoot")
+	p.AllowAttrs("align").WithValues(CellAlign[:]...).OnElements("tbody", "tfoot")
+	p.AllowAttrs("valign").WithValues(CellVerticalAlign[:]...).
+		OnElements("tbody", "tfoot")
 }
 
 func (p *Policy) AllowIFrames(vals ...SandboxValue) {

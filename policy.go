@@ -178,9 +178,38 @@ type Policy struct {
 }
 
 type attrPolicy struct {
+	singleValue string
+	values      map[string]struct{}
+
 	// optional pattern to match, when not nil the regexp needs to match
 	// otherwise the attribute is removed
 	regexp *regexp.Regexp
+}
+
+func (self *attrPolicy) Match(value string) bool {
+	matched := true
+	if self.singleValue != "" {
+		matched = false
+		if strings.ToLower(value) == self.singleValue {
+			return true
+		}
+	}
+
+	if self.values != nil {
+		matched = false
+		v := strings.ToLower(value)
+		if _, ok := self.values[v]; ok {
+			return true
+		}
+	}
+
+	if self.regexp != nil {
+		matched = false
+		if self.regexp.MatchString(value) {
+			return true
+		}
+	}
+	return matched
 }
 
 type stylePolicy struct {
@@ -202,6 +231,7 @@ type AttrPolicyBuilder struct {
 
 	attrNames  []string
 	regexp     *regexp.Regexp
+	values     []string
 	allowEmpty bool
 }
 
@@ -362,7 +392,6 @@ func (p *Policy) AllowNoAttrs() *AttrPolicyBuilder {
 // are called.
 func (abp *AttrPolicyBuilder) AllowNoAttrs() *AttrPolicyBuilder {
 	abp.allowEmpty = true
-
 	return abp
 }
 
@@ -370,7 +399,12 @@ func (abp *AttrPolicyBuilder) AllowNoAttrs() *AttrPolicyBuilder {
 // policy, and returns the attribute policy.
 func (abp *AttrPolicyBuilder) Matching(regex *regexp.Regexp) *AttrPolicyBuilder {
 	abp.regexp = regex
+	return abp
+}
 
+// WithValues allows given values and returns the attribute policy.
+func (abp *AttrPolicyBuilder) WithValues(values ...string) *AttrPolicyBuilder {
+	abp.values = values
 	return abp
 }
 
@@ -381,17 +415,11 @@ func (abp *AttrPolicyBuilder) OnElements(elements ...string) *Policy {
 		element = strings.ToLower(element)
 
 		for _, attr := range abp.attrNames {
-
 			if _, ok := abp.p.elsAndAttrs[element]; !ok {
 				abp.p.elsAndAttrs[element] = make(map[string][]attrPolicy)
 			}
-
-			ap := attrPolicy{}
-			if abp.regexp != nil {
-				ap.regexp = abp.regexp
-			}
-
-			abp.p.elsAndAttrs[element][attr] = append(abp.p.elsAndAttrs[element][attr], ap)
+			abp.p.elsAndAttrs[element][attr] = append(
+				abp.p.elsAndAttrs[element][attr], abp.attrPolicy())
 		}
 
 		if abp.allowEmpty {
@@ -406,6 +434,20 @@ func (abp *AttrPolicyBuilder) OnElements(elements ...string) *Policy {
 	return abp.p
 }
 
+func (abp *AttrPolicyBuilder) attrPolicy() attrPolicy {
+	ap := attrPolicy{regexp: abp.regexp}
+	if n := len(abp.values); n == 1 {
+		ap.singleValue = abp.values[0]
+	} else if n > 1 {
+		ap.values = make(map[string]struct{}, n)
+		for _, v := range abp.values {
+			v = strings.ToLower(v)
+			ap.values[v] = struct{}{}
+		}
+	}
+	return ap
+}
+
 // OnElementsMatching will bind an attribute policy to all elements matching a given regex
 // and return the updated policy
 func (abp *AttrPolicyBuilder) OnElementsMatching(regex *regexp.Regexp) *Policy {
@@ -413,11 +455,8 @@ func (abp *AttrPolicyBuilder) OnElementsMatching(regex *regexp.Regexp) *Policy {
 		if _, ok := abp.p.elsMatchingAndAttrs[regex]; !ok {
 			abp.p.elsMatchingAndAttrs[regex] = make(map[string][]attrPolicy)
 		}
-		ap := attrPolicy{}
-		if abp.regexp != nil {
-			ap.regexp = abp.regexp
-		}
-		abp.p.elsMatchingAndAttrs[regex][attr] = append(abp.p.elsMatchingAndAttrs[regex][attr], ap)
+		abp.p.elsMatchingAndAttrs[regex][attr] = append(
+			abp.p.elsMatchingAndAttrs[regex][attr], abp.attrPolicy())
 	}
 
 	if abp.allowEmpty {
@@ -437,13 +476,7 @@ func (abp *AttrPolicyBuilder) Globally() *Policy {
 		if _, ok := abp.p.globalAttrs[attr]; !ok {
 			abp.p.globalAttrs[attr] = []attrPolicy{}
 		}
-
-		ap := attrPolicy{}
-		if abp.regexp != nil {
-			ap.regexp = abp.regexp
-		}
-
-		abp.p.globalAttrs[attr] = append(abp.p.globalAttrs[attr], ap)
+		abp.p.globalAttrs[attr] = append(abp.p.globalAttrs[attr], abp.attrPolicy())
 	}
 
 	return abp.p

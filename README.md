@@ -36,6 +36,15 @@ This project is a fork of bluemonday. Changes from
   For allowed HTML elements `SkipElementsContent` marks their content is needed
   to be removed.
 
+* `WithValues` matcher for an attribute policy
+
+  This matcher allows an attribute with given values. Like
+
+  ```go
+  p.AllowAttrs("loading").WithValues("lazy").OnElements("img")
+  p.AllowAttrs("fetchpriority").WithValues("high", "low").OnElements("img")
+  ```
+
 bluemonday is a HTML sanitizer implemented in Go. It is fast and highly configurable.
 
 bluemonday takes untrusted user generated content as an input, and will return HTML that has been sanitised against an allowlist of approved HTML elements and attributes so that you can safely include the content in your web page.

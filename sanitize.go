@@ -514,12 +514,7 @@ attrsLoop:
 		// Is there an element specific attribute policy that applies?
 		if apl, ok := aps[htmlAttr.Key]; ok {
 			for _, ap := range apl {
-				if ap.regexp != nil {
-					if ap.regexp.MatchString(htmlAttr.Val) {
-						cleanAttrs = append(cleanAttrs, htmlAttr)
-						continue attrsLoop
-					}
-				} else {
+				if ap.Match(htmlAttr.Val) {
 					cleanAttrs = append(cleanAttrs, htmlAttr)
 					continue attrsLoop
 				}
@@ -529,12 +524,7 @@ attrsLoop:
 		// Is there a global attribute policy that applies?
 		if apl, ok := p.globalAttrs[htmlAttr.Key]; ok {
 			for _, ap := range apl {
-				if ap.regexp != nil {
-					if ap.regexp.MatchString(htmlAttr.Val) {
-						cleanAttrs = append(cleanAttrs, htmlAttr)
-						continue attrsLoop
-					}
-				} else {
+				if ap.Match(htmlAttr.Val) {
 					cleanAttrs = append(cleanAttrs, htmlAttr)
 					continue attrsLoop
 				}
