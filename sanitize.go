@@ -612,7 +612,7 @@ attrsLoop:
 						if err != nil {
 							continue
 						}
-						if u.Host != "" {
+						if u.IsAbs() || u.Hostname() != "" {
 							externalLink = true
 						}
 
