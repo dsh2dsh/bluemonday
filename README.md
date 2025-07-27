@@ -25,6 +25,12 @@ This project is a fork of bluemonday. Changes from
   })
   ```
 
+  An URL attribute can be removed by assigning it empty `url.URL` value, like:
+
+  ```go
+  *u = url.URL{}
+  ```
+
 * Handle more properties as URLs
 
   * `<video poster="">`

@@ -4209,6 +4209,15 @@ func TestRewriteURL(t *testing.T) {
 			in:       `<video poster="giraffe.gif" />`,
 			expected: `<video poster="https://example.com/giraffe.gif"/>`,
 		},
+		{
+			name:     "video poster removed",
+			in:       `<video poster="removeme.gif" />`,
+			expected: `<video/>`,
+		},
+		{
+			name: "img removed",
+			in:   `<img src="removeme.gif" />`,
+		},
 	}
 
 	pageURL, err := url.Parse("https://example.com/page.html")
@@ -4224,6 +4233,12 @@ func TestRewriteURL(t *testing.T) {
 		if u.IsAbs() {
 			return
 		}
+
+		if u.EscapedPath() == "removeme.gif" {
+			*u = url.URL{}
+			return
+		}
+
 		u2 := pageURL.ResolveReference(u)
 		*u = *u2
 	})

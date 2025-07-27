@@ -575,8 +575,10 @@ attrsLoop:
 						u, ok := p.validURL(htmlAttr.Val)
 						if !ok {
 							continue
+						} else if u = p.rewriteSrc(u); u == "" {
+							continue
 						}
-						htmlAttr.Val = p.rewriteSrc(u)
+						htmlAttr.Val = u
 					case "poster":
 						u, ok := p.validURL(htmlAttr.Val)
 						if !ok {
@@ -934,7 +936,7 @@ func (p *Policy) validURL(rawurl string) (string, bool) {
 
 	if !u.IsAbs() {
 		if p.allowRelativeURLs && u.String() != "" {
-			return p.rewriteURL(u), true
+			return p.rewriteURL(u)
 		}
 		return "", false
 	}
@@ -943,29 +945,34 @@ func (p *Policy) validURL(rawurl string) (string, bool) {
 	if !ok {
 		for _, r := range p.allowURLSchemeRegexps {
 			if r.MatchString(u.Scheme) {
-				return p.rewriteURL(u), true
+				return p.rewriteURL(u)
 			}
 		}
 		return "", false
 	}
 
 	if len(urlPolicies) == 0 {
-		return p.rewriteURL(u), true
+		return p.rewriteURL(u)
 	}
 
 	for _, urlPolicy := range urlPolicies {
 		if urlPolicy(u) {
-			return p.rewriteURL(u), true
+			return p.rewriteURL(u)
 		}
 	}
 	return "", false
 }
 
-func (p *Policy) rewriteURL(u *url.URL) string {
+func (p *Policy) rewriteURL(u *url.URL) (string, bool) {
 	if p.urlRewriter != nil {
 		p.urlRewriter(u)
 	}
-	return u.String()
+
+	var empty url.URL
+	if *u == empty {
+		return "", false
+	}
+	return u.String(), true
 }
 
 func (p *Policy) rewriteSrc(src string) string {
