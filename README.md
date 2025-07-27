@@ -51,6 +51,10 @@ This project is a fork of bluemonday. Changes from
   p.AllowAttrs("fetchpriority").WithValues("high", "low").OnElements("img")
   ```
 
+* Add support for HTML [hidden global attribute]
+
+  [hidden global attribute]:https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Global_attributes/hidden
+
 bluemonday is a HTML sanitizer implemented in Go. It is fast and highly configurable.
 
 bluemonday takes untrusted user generated content as an input, and will return HTML that has been sanitised against an allowlist of approved HTML elements and attributes so that you can safely include the content in your web page.

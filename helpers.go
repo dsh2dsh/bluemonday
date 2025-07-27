@@ -33,6 +33,9 @@ import (
 	"encoding/base64"
 	"net/url"
 	"regexp"
+	"slices"
+
+	"golang.org/x/net/html"
 )
 
 // A selection of regular expressions that can be used as .Matching() rules on
@@ -295,4 +298,10 @@ func (p *Policy) AllowIFrames(vals ...SandboxValue) {
 	p.AllowAttrs("sandbox").OnElements("iframe")
 
 	p.RequireSandboxOnIFrame(vals...)
+}
+
+func containsHidden(attrs []html.Attribute) bool {
+	return slices.ContainsFunc(attrs, func(a html.Attribute) bool {
+		return a.Key == "hidden" && a.Namespace == ""
+	})
 }

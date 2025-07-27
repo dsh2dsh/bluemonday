@@ -222,10 +222,9 @@ func (p *Policy) sanitize(r io.Reader, w io.Writer) error {
 	}
 
 	var (
+		hidden                   int64
 		skipElementContent       bool
-		skippingElementsCount    int64
-		skipClosingTag           bool
-		closingTagToSkipStack    []string
+		skipClosingTag           []string
 		mostRecentlyStartedToken string
 	)
 
@@ -265,6 +264,18 @@ func (p *Policy) sanitize(r io.Reader, w io.Writer) error {
 
 		case html.StartTagToken:
 
+			if hidden > 0 {
+				hidden++
+				continue
+			} else if containsHidden(token.Attr) {
+				hidden++
+				skipElementContent = true
+				if err := p.maybeAddSpaces(buff); err != nil {
+					return err
+				}
+				continue
+			}
+
 			mostRecentlyStartedToken = normaliseElementName(token.Data)
 			switch mostRecentlyStartedToken {
 			case "script", "style":
@@ -278,93 +289,84 @@ func (p *Policy) sanitize(r io.Reader, w io.Writer) error {
 				aa, matched := p.matchRegex(token.Data)
 				if !matched {
 					if _, ok := p.setOfElementsToSkipContent[token.Data]; ok {
+						hidden++
 						skipElementContent = true
-						skippingElementsCount++
 					}
-					if p.addSpaces {
-						if _, err := buff.WriteString(" "); err != nil {
-							return fmt.Errorf(genericErrMsg, err)
-						}
+					if err := p.maybeAddSpaces(buff); err != nil {
+						return err
 					}
-					break
+					continue
 				}
 				aps = aa
 			}
+
 			if len(token.Attr) != 0 {
 				token.Attr = p.sanitizeAttrs(token.Data, token.Attr, aps)
 			}
 
-			if len(token.Attr) == 0 {
-				if !p.allowNoAttrs(token.Data) {
-					skipClosingTag = true
-					closingTagToSkipStack = append(closingTagToSkipStack, token.Data)
-					if p.addSpaces {
-						if _, err := buff.WriteString(" "); err != nil {
-							return fmt.Errorf(genericErrMsg, err)
-						}
-					}
-					break
+			if p.skipToken(&token) {
+				skipClosingTag = append(skipClosingTag, token.Data)
+				if err := p.maybeAddSpaces(buff); err != nil {
+					return err
 				}
+				break
 			}
 
-			if !skipElementContent {
-				if _, err := buff.WriteString(token.String()); err != nil {
-					return fmt.Errorf(genericErrMsg, err)
-				}
-				switch mostRecentlyStartedToken {
-				case "script", "style":
-				default:
-					if _, ok := p.setOfElementsToSkipContent[token.Data]; ok {
-						skipElementContent = true
-					}
+			if skipElementContent {
+				continue
+			} else if _, err := buff.WriteString(token.String()); err != nil {
+				return fmt.Errorf(genericErrMsg, err)
+			}
+
+			switch mostRecentlyStartedToken {
+			case "script", "style":
+			default:
+				if _, ok := p.setOfElementsToSkipContent[token.Data]; ok {
+					skipElementContent = true
 				}
 			}
 
 		case html.EndTagToken:
+
+			if hidden > 0 {
+				hidden--
+				if hidden == 0 {
+					skipElementContent = false
+					if err := p.maybeAddSpaces(buff); err != nil {
+						return err
+					}
+				}
+				continue
+			}
 
 			elementName := normaliseElementName(token.Data)
 			if mostRecentlyStartedToken == elementName {
 				mostRecentlyStartedToken = ""
 			}
 
-			if elementName == "script" || elementName == "style" {
-				if !p.allowUnsafe {
-					continue
-				}
+			if (elementName == "script" || elementName == "style") && !p.allowUnsafe {
+				continue
 			}
 
-			if skipClosingTag && closingTagToSkipStack[len(closingTagToSkipStack)-1] == token.Data {
-				closingTagToSkipStack = closingTagToSkipStack[:len(closingTagToSkipStack)-1]
-				if len(closingTagToSkipStack) == 0 {
-					skipClosingTag = false
-				}
-				if p.addSpaces {
-					if _, err := buff.WriteString(" "); err != nil {
-						return fmt.Errorf(genericErrMsg, err)
-					}
+			if len(skipClosingTag) != 0 && skipClosingTag[len(skipClosingTag)-1] == token.Data {
+				skipClosingTag = skipClosingTag[:len(skipClosingTag)-1]
+				if err := p.maybeAddSpaces(buff); err != nil {
+					return err
 				}
 				break
 			}
+
 			if _, ok := p.elsAndAttrs[token.Data]; !ok {
-				match := false
+				var match bool
 				for regex := range p.elsMatchingAndAttrs {
 					if regex.MatchString(token.Data) {
-						skipElementContent = false
 						match = true
 						break
 					}
 				}
-				if _, ok := p.setOfElementsToSkipContent[token.Data]; ok && !match {
-					skippingElementsCount--
-					if skippingElementsCount == 0 {
-						skipElementContent = false
-					}
-				}
 				if !match {
-					if p.addSpaces {
-						if _, err := buff.WriteString(" "); err != nil {
-							return fmt.Errorf(genericErrMsg, err)
-						}
+					if err := p.maybeAddSpaces(buff); err != nil {
+						return err
 					}
 					break
 				}
@@ -387,6 +389,10 @@ func (p *Policy) sanitize(r io.Reader, w io.Writer) error {
 
 		case html.SelfClosingTagToken:
 
+			if hidden > 0 {
+				continue
+			}
+
 			switch normaliseElementName(token.Data) {
 			case "script", "style":
 				if !p.allowUnsafe {
@@ -398,10 +404,8 @@ func (p *Policy) sanitize(r io.Reader, w io.Writer) error {
 			if !ok {
 				aa, matched := p.matchRegex(token.Data)
 				if !matched {
-					if p.addSpaces && !matched {
-						if _, err := buff.WriteString(" "); err != nil {
-							return fmt.Errorf(genericErrMsg, err)
-						}
+					if err := p.maybeAddSpaces(buff); err != nil {
+						return err
 					}
 					break
 				}
@@ -412,14 +416,13 @@ func (p *Policy) sanitize(r io.Reader, w io.Writer) error {
 				token.Attr = p.sanitizeAttrs(token.Data, token.Attr, aps)
 			}
 
-			if len(token.Attr) == 0 && !p.allowNoAttrs(token.Data) {
-				if p.addSpaces {
-					if _, err := buff.WriteString(" "); err != nil {
-						return fmt.Errorf(genericErrMsg, err)
-					}
+			if p.skipToken(&token) {
+				if err := p.maybeAddSpaces(buff); err != nil {
+					return err
 				}
 				break
 			}
+
 			if !skipElementContent {
 				if _, err := buff.WriteString(token.String()); err != nil {
 					return fmt.Errorf(genericErrMsg, err)
@@ -428,23 +431,25 @@ func (p *Policy) sanitize(r io.Reader, w io.Writer) error {
 
 		case html.TextToken:
 
-			if !skipElementContent {
-				switch mostRecentlyStartedToken {
-				case "script", "style":
-					// not encouraged, but if a policy allows JavaScript or CSS styles we
-					// should not HTML escape it as that would break the output
-					//
-					// requires p.AllowUnsafe()
-					if p.allowUnsafe {
-						if _, err := buff.WriteString(token.Data); err != nil {
-							return fmt.Errorf(genericErrMsg, err)
-						}
-					}
-				default:
-					// HTML escape the text
-					if _, err := buff.WriteString(token.String()); err != nil {
+			if skipElementContent {
+				continue
+			}
+
+			switch mostRecentlyStartedToken {
+			case "script", "style":
+				// not encouraged, but if a policy allows JavaScript or CSS styles we
+				// should not HTML escape it as that would break the output
+				//
+				// requires p.AllowUnsafe()
+				if p.allowUnsafe {
+					if _, err := buff.WriteString(token.Data); err != nil {
 						return fmt.Errorf(genericErrMsg, err)
 					}
+				}
+			default:
+				// HTML escape the text
+				if _, err := buff.WriteString(token.String()); err != nil {
+					return fmt.Errorf(genericErrMsg, err)
 				}
 			}
 
@@ -453,6 +458,17 @@ func (p *Policy) sanitize(r io.Reader, w io.Writer) error {
 			return fmt.Errorf("bluemonday: unknown token: %v", token)
 		}
 	}
+}
+
+func (p *Policy) maybeAddSpaces(buff io.StringWriter) error {
+	if !p.addSpaces {
+		return nil
+	}
+
+	if _, err := buff.WriteString(" "); err != nil {
+		return fmt.Errorf(genericErrMsg, err)
+	}
+	return nil
 }
 
 // sanitizeAttrs takes a set of element attribute policies and the global
@@ -889,6 +905,10 @@ decLoop:
 		attr.Val = ""
 	}
 	return attr
+}
+
+func (p *Policy) skipToken(t *html.Token) bool {
+	return len(t.Attr) == 0 && !p.allowNoAttrs(t.Data)
 }
 
 func (p *Policy) allowNoAttrs(elementName string) bool {

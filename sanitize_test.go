@@ -4271,3 +4271,15 @@ func TestWithValues(t *testing.T) {
 	input = `<tag one="four">test</tag>`
 	assert.Equal(t, input, p.Sanitize(input))
 }
+
+func TestHidden(t *testing.T) {
+	input := `<p>Before paragraph.</p><p hidden>This should <em>not</em> appear in the <strong>output</strong></p><p>After paragraph.</p>`
+	expected := `<p>Before paragraph.</p><p>After paragraph.</p>`
+
+	p := UGCPolicy()
+	assert.Equal(t, expected, p.Sanitize(input))
+
+	p.AddSpaceWhenStrippingTag(true)
+	expected = `<p>Before paragraph.</p>  <p>After paragraph.</p>`
+	assert.Equal(t, expected, p.Sanitize(input))
+}
