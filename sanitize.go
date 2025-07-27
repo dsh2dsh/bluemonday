@@ -186,7 +186,7 @@ func (p *Policy) sanitize(r io.Reader, w io.Writer) error {
 				continue
 			}
 
-			mostRecentlyStartedToken = normaliseElementName(token.Data)
+			mostRecentlyStartedToken = token.Data
 			switch mostRecentlyStartedToken {
 			case "script", "style":
 				if !p.allowUnsafe {
@@ -249,7 +249,7 @@ func (p *Policy) sanitize(r io.Reader, w io.Writer) error {
 				continue
 			}
 
-			elementName := normaliseElementName(token.Data)
+			elementName := token.Data
 			if mostRecentlyStartedToken == elementName {
 				mostRecentlyStartedToken = ""
 			}
@@ -303,7 +303,7 @@ func (p *Policy) sanitize(r io.Reader, w io.Writer) error {
 				continue
 			}
 
-			switch normaliseElementName(token.Data) {
+			switch token.Data {
 			case "script", "style":
 				if !p.allowUnsafe {
 					continue
@@ -1007,23 +1007,4 @@ func (p *Policy) matchRegex(elementName string) (map[string][]attrPolicy, bool) 
 		}
 	}
 	return aps, matched
-}
-
-// normaliseElementName takes a HTML element like <script> which is user input
-// and returns a lower case version of it that is immune to UTF-8 to ASCII
-// conversion tricks (like the use of upper case cyrillic i scrİpt which a
-// strings.ToLower would convert to script). Instead this func will preserve
-// all non-ASCII as their escaped equivalent, i.e. \u0130 which reveals the
-// characters when lower cased
-func normaliseElementName(str string) string {
-	// that useful QuoteToASCII put quote marks at the start and end
-	// so those are trimmed off
-	return strings.TrimSuffix(
-		strings.TrimPrefix(
-			strings.ToLower(
-				strconv.QuoteToASCII(str),
-			),
-			`"`),
-		`"`,
-	)
 }
