@@ -531,29 +531,26 @@ func (p *Policy) validateURLs(t *html.Token, attrs []html.Attribute,
 	case atom.Blockquote, atom.Del, atom.Ins, atom.Q:
 		_, attrs = p.deleteInvalidURL("cite", attrs)
 
-	case atom.Audio, atom.Embed, atom.Iframe, atom.Img, atom.Script,
-		atom.Source, atom.Track, atom.Video:
+	case atom.Audio, atom.Embed, atom.Iframe, atom.Script, atom.Track:
+		_, attrs = p.deleteInvalidURL("src", attrs, p.rewriteSrc)
 
-		_, attrs = p.deleteInvalidURL("poster", attrs)
-		i, attr := findAttribute("src", attrs)
-		if attr == nil {
-			break
+	case atom.Img, atom.Source:
+		src, attrs2 := p.deleteInvalidURL("src", attrs, p.rewriteSrc)
+		attrs2, srcSetOk := p.sanitizeSrcSet(attrs2)
+		if src == nil && !srcSetOk {
+			return nil, nil
 		}
+		attrs = attrs2
 
-		u := p.validURL(attr.Val)
-		if u == nil {
-			attrs = slices.Delete(attrs, i, i+1)
-			break
-		} else if u := p.rewriteSrc(u); u == nil {
-			attrs = slices.Delete(attrs, i, i+1)
-			break
-		}
-		attr.Val = u.String()
+	case atom.Video:
+		_, attrs = p.deleteInvalidURL("poster", attrs, p.rewriteSrc)
+		_, attrs = p.deleteInvalidURL("src", attrs, p.rewriteSrc)
 	}
 	return href, attrs
 }
 
 func (p *Policy) deleteInvalidURL(name string, attrs []html.Attribute,
+	rewriters ...func(*url.URL) *url.URL,
 ) (*url.URL, []html.Attribute) {
 	i, attr := findAttribute(name, attrs)
 	if attr == nil {
@@ -563,6 +560,12 @@ func (p *Policy) deleteInvalidURL(name string, attrs []html.Attribute,
 	u := p.validURL(attr.Val)
 	if u == nil {
 		return nil, slices.Delete(attrs, i, i+1)
+	}
+
+	for _, fn := range rewriters {
+		if u = fn(u); u == nil {
+			return nil, slices.Delete(attrs, i, i+1)
+		}
 	}
 
 	attr.Val = u.String()
@@ -640,6 +643,40 @@ func (p *Policy) rewriteSrc(u *url.URL) *url.URL {
 		return nil
 	}
 	return u
+}
+
+func (p *Policy) sanitizeSrcSet(attrs []html.Attribute) ([]html.Attribute, bool) {
+	i, attr := findAttribute("srcset", attrs)
+	if attr == nil {
+		return attrs, false
+	}
+
+	images := p.parseSrcSetAttribute(attr.Val)
+	if len(images) == 0 {
+		return slices.Delete(attrs, i, i+1), false
+	}
+
+	var removed int
+	for _, img := range images {
+		if u := p.rewriteSrc(img.URL()); u == nil {
+			removed++
+			img.ImageURL = ""
+		}
+	}
+
+	if removed == len(images) {
+		return slices.Delete(attrs, i, i+1), false
+	} else if removed > 0 {
+		images = slices.DeleteFunc(images, func(img *imageCandidate) bool {
+			return img.ImageURL == ""
+		})
+		if len(images) == 0 {
+			return slices.Delete(attrs, i, i+1), false
+		}
+	}
+
+	attr.Val = images.String()
+	return attrs, true
 }
 
 func (p *Policy) requireRelTargetBlank() bool {

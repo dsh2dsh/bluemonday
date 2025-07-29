@@ -209,7 +209,7 @@ func (p *Policy) AllowImages() {
 
 	// Standard URLs enabled
 	p.AllowStandardURLs()
-	p.AllowAttrs("src").OnElements("img")
+	p.AllowAttrs("src", "srcset").OnElements("img")
 }
 
 // AllowDataURIImages permits the use of inline images defined in RFC2397

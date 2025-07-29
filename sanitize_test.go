@@ -166,8 +166,7 @@ func TestLinks(t *testing.T) {
 			expected: `<a href="?q=1&amp;r=2&amp;s=:foo@" rel="nofollow">`,
 		},
 		{
-			in:       `<img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUAAAAFCAYAAACNbyblAAAAHElEQVQI12P4//8/w38GIAXDIBKE0DHxgljNBAAO9TXL0Y4OHwAAAABJRU5ErkJggg==" alt="Red dot" />`,
-			expected: `<img alt="Red dot"/>`,
+			in: `<img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUAAAAFCAYAAACNbyblAAAAHElEQVQI12P4//8/w38GIAXDIBKE0DHxgljNBAAO9TXL0Y4OHwAAAABJRU5ErkJggg==" alt="Red dot" />`,
 		},
 		{
 			in:       `<img src="giraffe.gif" />`,
@@ -259,8 +258,7 @@ func TestLinkTargets(t *testing.T) {
 			expected: `<a href="?q=1">`,
 		},
 		{
-			in:       `<img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUAAAAFCAYAAACNbyblAAAAHElEQVQI12P4//8/w38GIAXDIBKE0DHxgljNBAAO9TXL0Y4OHwAAAABJRU5ErkJggg==" alt="Red dot" />`,
-			expected: `<img alt="Red dot"/>`,
+			in: `<img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUAAAAFCAYAAACNbyblAAAAHElEQVQI12P4//8/w38GIAXDIBKE0DHxgljNBAAO9TXL0Y4OHwAAAABJRU5ErkJggg==" alt="Red dot" />`,
 		},
 		{
 			in:       `<img src="giraffe.gif" />`,
@@ -4229,4 +4227,97 @@ func TestHidden(t *testing.T) {
 	p.AddSpaceWhenStrippingTag(true)
 	expected = `<p>Before paragraph.</p>  <p>After paragraph.</p>`
 	assert.Equal(t, expected, p.Sanitize(input))
+}
+
+func TestSrcSet(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "img srcset",
+			input:    `<img srcset="https://example.org/example-320w.jpg, https://example.org/example-480w.jpg 1.5x, https://example.org/example-640w.jpg 2x, https://example.org/example-640w.jpg 640w" src="https://example.org/example-640w.jpg" alt="Example"/>`,
+			expected: `<img srcset="https://example.org/example-320w.jpg, https://example.org/example-480w.jpg 1.5x, https://example.org/example-640w.jpg 2x, https://example.org/example-640w.jpg 640w" src="https://example.org/example-640w.jpg" alt="Example"/>`,
+		},
+		{
+			name:     "source srcset",
+			input:    `<source srcset="https://example.org/example-320w.jpg, https://example.org/example-480w.jpg 1.5x, https://example.org/example-640w.jpg 2x, https://example.org/example-640w.jpg 640w" src="https://example.org/example-640w.jpg"/>`,
+			expected: `<source srcset="https://example.org/example-320w.jpg, https://example.org/example-480w.jpg 1.5x, https://example.org/example-640w.jpg 2x, https://example.org/example-640w.jpg 640w" src="https://example.org/example-640w.jpg"/>`,
+		},
+		{
+			name:     "invalid srcset",
+			input:    `<img srcset="://example.com/example-320w.jpg" src="example-640w.jpg" alt="Example"/>`,
+			expected: `<img src="https://example.com/example-640w.jpg" alt="Example"/>`,
+		},
+		{
+			name:  "invalid img",
+			input: `<img srcset="://example.com/example-320w.jpg" src="://example.com/example-640w.jpg" alt="Example"/>`,
+		},
+		{
+			name:  "invalid source",
+			input: `<source srcset="://example.com/example-320w.jpg" src="://example.com/example-640w.jpg"/>`,
+		},
+		{
+			name:     "srcset and no src",
+			input:    `<img srcset="example-320w.jpg, example-480w.jpg 1.5x,   example-640w.jpg 2x, example-640w.jpg 640w" alt="Example"/>`,
+			expected: `<img srcset="https://example.com/example-320w.jpg, https://example.com/example-480w.jpg 1.5x, https://example.com/example-640w.jpg 2x, https://example.com/example-640w.jpg 640w" alt="Example"/>`,
+		},
+		{
+			name:  "removed by rewriter",
+			input: `<img src="removeMe.gif" alt="Example"/>`,
+		},
+		{
+			name:     "with relative URLs",
+			input:    `<img srcset="example-320w.jpg, example-480w.jpg 1.5x,   example-640,w.jpg 2x, example-640w.jpg 640w"/>`,
+			expected: `<img srcset="https://example.com/example-320w.jpg, https://example.com/example-480w.jpg 1.5x, https://example.com/example-640,w.jpg 2x, https://example.com/example-640w.jpg 640w"/>`,
+		},
+		{
+			name:     "with absolute URLs",
+			input:    `<img srcset="http://example.org/example-320w.jpg 320w, http://example.org/example-480w.jpg 1.5x"/>`,
+			expected: `<img srcset="http://example.org/example-320w.jpg 320w, http://example.org/example-480w.jpg 1.5x"/>`,
+		},
+		{
+			name:     "with one candidate",
+			input:    `<img srcset="http://example.org/example-320w.jpg"/>`,
+			expected: `<img srcset="http://example.org/example-320w.jpg"/>`,
+		},
+		{
+			name:     "with comma URL",
+			input:    `<img srcset="http://example.org/example,a:b/d.jpg , example-480w.jpg 1.5x"/>`,
+			expected: `<img srcset="http://example.org/example,a:b/d.jpg, https://example.com/example-480w.jpg 1.5x"/>`,
+		},
+		{
+			name:  "with incorrect descriptor",
+			input: `<img srcset="http://example.org/example-320w.jpg test"/>`,
+		},
+		{
+			name:  "with too many descriptors",
+			input: `<img srcset="http://example.org/example-320w.jpg 10w 1x"/>`,
+		},
+	}
+
+	pageURL, err := url.Parse("https://example.com/page.html")
+	require.NoError(t, err)
+
+	p := UGCPolicy().AllowAttrs("src", "srcset").OnElements("source")
+	p.RewriteURL(func(u *url.URL) {
+		if u.IsAbs() {
+			return
+		}
+		u2 := pageURL.ResolveReference(u)
+		*u = *u2
+	})
+
+	p.RewriteSrc(func(u *url.URL) {
+		if u.EscapedPath() == "/removeMe.gif" {
+			*u = url.URL{}
+		}
+	})
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, p.Sanitize(tt.input))
+		})
+	}
 }

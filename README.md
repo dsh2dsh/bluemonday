@@ -55,6 +55,11 @@ This project is a fork of bluemonday. Changes from
 
   [hidden global attribute]:https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Global_attributes/hidden
 
+* Add validation of `srcset` attribute of `img` and `source` elements.
+
+  `UGCPolicy()` allows `srcset` on `img` elements. `source` still isn't allowed
+  by default.
+
 bluemonday is a HTML sanitizer implemented in Go. It is fast and highly configurable.
 
 bluemonday takes untrusted user generated content as an input, and will return HTML that has been sanitised against an allowlist of approved HTML elements and attributes so that you can safely include the content in your web page.
