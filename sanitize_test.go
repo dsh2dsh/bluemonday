@@ -31,6 +31,7 @@ package bluemonday
 
 import (
 	"bytes"
+	_ "embed"
 	"encoding/base64"
 	"net/url"
 	"regexp"
@@ -41,7 +42,26 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/html"
+	"golang.org/x/net/html/atom"
 )
+
+//go:embed testdata/miniflux_github.html
+var githubHTML string
+
+//go:embed testdata/miniflux_wikipedia.html
+var wikipediaHTML string
+
+func BenchmarkSanitize(b *testing.B) {
+	inputs := []string{githubHTML, wikipediaHTML}
+	p := UGCPolicy()
+
+	b.ReportAllocs()
+	for b.Loop() {
+		for _, s := range inputs {
+			p.Sanitize(s)
+		}
+	}
+}
 
 // test is a simple input vs output struct used to construct a slice of many
 // tests to run within a single test method.
@@ -208,11 +228,11 @@ func TestLinkTargets(t *testing.T) {
 	tests := []test{
 		{
 			in:       `<a href="http://www.google.com">`,
-			expected: `<a href="http://www.google.com" rel="nofollow noopener" target="_blank">`,
+			expected: `<a href="http://www.google.com" target="_blank" rel="nofollow noopener">`,
 		},
 		{
 			in:       `<a href="//www.google.com">`,
-			expected: `<a href="//www.google.com" rel="nofollow noopener" target="_blank">`,
+			expected: `<a href="//www.google.com" target="_blank" rel="nofollow noopener">`,
 		},
 		{
 			in:       `<a href="/www.google.com">`,
@@ -1397,7 +1417,7 @@ func TestTargetBlankNoOpener(t *testing.T) {
 		},
 		{
 			in:       `<a href="https://www.google.com/" />`,
-			expected: `<a href="https://www.google.com/" rel="nofollow noopener" target="_blank"/>`,
+			expected: `<a href="https://www.google.com/" target="_blank" rel="nofollow noopener"/>`,
 		},
 		{
 			in:       `<a href="https://www.google.com/" target="_blank"/>`,
@@ -1405,15 +1425,15 @@ func TestTargetBlankNoOpener(t *testing.T) {
 		},
 		{
 			in:       `<a href="https://www.google.com/" rel="nofollow"/>`,
-			expected: `<a href="https://www.google.com/" rel="nofollow noopener" target="_blank"/>`,
+			expected: `<a href="https://www.google.com/" target="_blank" rel="nofollow noopener"/>`,
 		},
 		{
 			in:       `<a href="https://www.google.com/" rel="noopener"/>`,
-			expected: `<a href="https://www.google.com/" rel="nofollow noopener" target="_blank"/>`,
+			expected: `<a href="https://www.google.com/" target="_blank" rel="nofollow noopener"/>`,
 		},
 		{
 			in:       `<a href="https://www.google.com/" rel="noopener nofollow" />`,
-			expected: `<a href="https://www.google.com/" rel="nofollow noopener" target="_blank"/>`,
+			expected: `<a href="https://www.google.com/" target="_blank" rel="nofollow noopener"/>`,
 		},
 		{
 			in:       `<a href="https://www.google.com/" target="foo" />`,
@@ -3338,7 +3358,7 @@ func TestIssue9(t *testing.T) {
 
 	tt = test{
 		in:       `<h2><a name="git-diff" class="anchor" href="https://github.com/shurcooL/github_flavored_markdown/blob/master/sanitize_test.go" aria-hidden="true"><span class="octicon octicon-link"></span></a>git diff</h2>`,
-		expected: `<h2><a name="git-diff" class="anchor" href="https://github.com/shurcooL/github_flavored_markdown/blob/master/sanitize_test.go" aria-hidden="true" rel="nofollow noopener" target="_blank"><span class="octicon octicon-link"></span></a>git diff</h2>`,
+		expected: `<h2><a name="git-diff" class="anchor" href="https://github.com/shurcooL/github_flavored_markdown/blob/master/sanitize_test.go" aria-hidden="true" target="_blank" rel="nofollow noopener"><span class="octicon octicon-link"></span></a>git diff</h2>`,
 	}
 	out = p.Sanitize(tt.in)
 	if out != tt.expected {
@@ -3352,7 +3372,7 @@ func TestIssue9(t *testing.T) {
 
 	tt = test{
 		in:       `<h2><a name="git-diff" class="anchor" href="https://github.com/shurcooL/github_flavored_markdown/blob/master/sanitize_test.go" aria-hidden="true" target="namedwindow"><span class="octicon octicon-link"></span></a>git diff</h2>`,
-		expected: `<h2><a name="git-diff" class="anchor" href="https://github.com/shurcooL/github_flavored_markdown/blob/master/sanitize_test.go" aria-hidden="true" rel="nofollow noopener" target="_blank"><span class="octicon octicon-link"></span></a>git diff</h2>`,
+		expected: `<h2><a name="git-diff" class="anchor" href="https://github.com/shurcooL/github_flavored_markdown/blob/master/sanitize_test.go" aria-hidden="true" target="_blank" rel="nofollow noopener"><span class="octicon octicon-link"></span></a>git diff</h2>`,
 	}
 	out = p.Sanitize(tt.in)
 	if out != tt.expected {
@@ -3593,7 +3613,7 @@ func TestIssue85(t *testing.T) {
 		},
 		{
 			in:       `<a href="https://www.google.com/" />`,
-			expected: `<a href="https://www.google.com/" rel="nofollow noreferrer noopener" target="_blank"/>`,
+			expected: `<a href="https://www.google.com/" target="_blank" rel="nofollow noreferrer noopener"/>`,
 		},
 		{
 			in:       `<a href="https://www.google.com/" target="_blank"/>`,
@@ -4065,7 +4085,7 @@ func TestCallbackForAttributes(t *testing.T) {
 	tests := []test{
 		{
 			in:       `<a href="http://www.google.com">`,
-			expected: `<a href="http://www.google.com/ATTR" rel="nofollow noopener" target="_blank">`,
+			expected: `<a href="http://www.google.com/ATTR" target="_blank" rel="nofollow noopener">`,
 		},
 		{
 			in:       `<A Href="?q=1">`,
@@ -4087,45 +4107,31 @@ func TestCallbackForAttributes(t *testing.T) {
 	p.RequireNoFollowOnFullyQualifiedLinks(true)
 	p.AddTargetBlankToFullyQualifiedLinks(true)
 
-	p.SetCallbackForAttributes(func(elementName string, attrs []html.Attribute) []html.Attribute {
-		if elementName == "img" {
-			for i := range len(attrs) {
-				if attrs[i].Key == "src" && attrs[i].Val == "giraffe.gif" {
-					attrs[i].Val = "giraffe1.gif"
-					break
-				}
-				if attrs[i].Key == "src" && attrs[i].Val == "new.gif" {
-					return nil
-				}
+	p.SetCallbackForAttributes(func(t *html.Token) []html.Attribute {
+		attrs := t.Attr
+		switch t.DataAtom {
+		case atom.Img:
+			_, src := findAttribute("src", attrs)
+			switch src.Val {
+			case "giraffe.gif":
+				src.Val = "giraffe1.gif"
+			case "new.gif":
+				return nil
 			}
-		}
-
-		if elementName == "a" {
-			for i := range len(attrs) {
-				if attrs[i].Key == "href" && attrs[i].Val == "?q=1" {
-					attrs[i].Val = "?q=2"
-					break
-				}
-				if attrs[i].Key == "href" && attrs[i].Val == "http://www.google.com" {
-					attrs[i].Val = "http://www.google.com/ATTR"
-					break
-				}
+		case atom.A:
+			_, href := findAttribute("href", attrs)
+			switch href.Val {
+			case "?q=1":
+				href.Val = "?q=2"
+			case "http://www.google.com":
+				href.Val = "http://www.google.com/ATTR"
 			}
 		}
 		return attrs
 	})
 
-	for ii, tt := range tests {
-		out := p.Sanitize(tt.in)
-		if out != tt.expected {
-			t.Errorf(
-				"test %d failed;\ninput   : %s\noutput  : %s\nexpected: %s",
-				ii,
-				tt.in,
-				out,
-				tt.expected,
-			)
-		}
+	for _, tt := range tests {
+		assert.Equal(t, tt.expected, p.Sanitize(tt.in))
 	}
 }
 
@@ -4138,12 +4144,12 @@ func TestRewriteURL(t *testing.T) {
 		{
 			name:     "abs",
 			in:       `<a href="http://www.google.com">`,
-			expected: `<a href="http://www.google.com" rel="nofollow noreferrer noopener" target="_blank">`,
+			expected: `<a href="http://www.google.com" target="_blank" rel="nofollow noreferrer noopener">`,
 		},
 		{
 			name:     "rel",
 			in:       `<a href="/page2.html">`,
-			expected: `<a href="https://example.com/page2.html" rel="nofollow noreferrer noopener" target="_blank">`,
+			expected: `<a href="https://example.com/page2.html" target="_blank" rel="nofollow noreferrer noopener">`,
 		},
 		{
 			name:     "video poster",

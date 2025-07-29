@@ -169,7 +169,7 @@ type Policy struct {
 	// attributes are parsed. The callback function can add/remove/modify the
 	// element's attributes. If the callback returns nil or empty array of html
 	// attributes then the attributes will not be included in the output.
-	callbackAttr CallbackAttrFunc
+	callbackAttr func(*html.Token) []html.Attribute
 
 	// If urlRewriter is not nil, it is used to rewrite any attribute of tags that
 	// download resources, such as <a> or <img>. It requires that the URL is
@@ -244,12 +244,6 @@ type StylePolicyBuilder struct {
 	handler       func(string) bool
 }
 
-// CallbackAttrFunc is callback function that will be called before element's
-// attributes are parsed. The callback function can add/remove/modify the
-// element's attributes. If the callback returns nil or empty array of html
-// attributes then the attributes will not be included in the output.
-type CallbackAttrFunc = func(elementName string, attrs []html.Attribute) []html.Attribute
-
 type urlPolicy func(url *url.URL) (allowUrl bool)
 
 type URLRewriter func(*url.URL)
@@ -308,7 +302,8 @@ func NewPolicy() *Policy {
 // add/remove/modify the element's attributes. If the callback returns nil or
 // empty array of html attributes then the attributes will not be included in
 // the output. SetCallbackForAttributes is not goroutine safe.
-func (p *Policy) SetCallbackForAttributes(cb CallbackAttrFunc) *Policy {
+func (p *Policy) SetCallbackForAttributes(cb func(*html.Token) []html.Attribute,
+) *Policy {
 	p.callbackAttr = cb
 	return p
 }

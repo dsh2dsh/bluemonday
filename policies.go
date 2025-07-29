@@ -190,7 +190,7 @@ func UGCPolicy() *Policy {
 	//////////////////////
 
 	// "bdi" "bdo" are permitted
-	p.AllowAttrs("dir").WithValues(Direction[:]...).OnElements("bdi", "bdo")
+	p.AllowAttrs("dir").WithValues(Direction()...).OnElements("bdi", "bdo")
 
 	// "rp" "rt" "ruby" are permitted
 	p.AllowElements("rp", "rt", "ruby")

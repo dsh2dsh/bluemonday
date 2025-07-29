@@ -41,25 +41,6 @@ import (
 // A selection of regular expressions that can be used as .Matching() rules on
 // HTML attributes.
 var (
-	// CellAlign handles the `align` attribute
-	// https://developer.mozilla.org/en-US/docs/Web/HTML/Element/td#attr-align
-	CellAlign = [...]string{"center", "justify", "left", "right", "char"}
-
-	// CellVerticalAlign handles the `valign` attribute
-	// https://developer.mozilla.org/en-US/docs/Web/HTML/Element/td#attr-valign
-	CellVerticalAlign = [...]string{"baseline", "bottom", "middle", "top"}
-
-	// Direction handles the `dir` attribute
-	// https://developer.mozilla.org/en-US/docs/Web/HTML/Element/bdo#attr-dir
-	Direction = [...]string{"rtl", "ltr"}
-
-	// ImageAlign handles the `align` attribute on the `image` tag
-	// http://www.w3.org/MarkUp/Test/Img/imgtest.html
-	ImageAlign = [...]string{
-		"left", "right", "top", "texttop", "middle", "absmiddle", "baseline",
-		"bottom", "absbottom",
-	}
-
 	// Integer describes whole positive integers (including 0) used in places
 	// like td.colspan
 	// https://developer.mozilla.org/en-US/docs/Web/HTML/Element/td#attr-colspan
@@ -90,11 +71,6 @@ var (
 			`?Z?([\+-][0-9]{2}:[0-9]{2})?)?)?)?$`,
 	)
 
-	// ListType encapsulates the common value as well as the latest spec
-	// values for lists
-	// https://developer.mozilla.org/en-US/docs/Web/HTML/Element/ol#attr-type
-	ListType = [...]string{"circle", "disc", "square", "a", "i", "1"}
-
 	// SpaceSeparatedTokens is used in places like `a.rel` and the common attribute
 	// `class` which both contain space delimited lists of data tokens
 	// http://www.w3.org/TR/html-markup/datatypes.html#common.data.tokens-def
@@ -114,6 +90,32 @@ var (
 	// https://developer.mozilla.org/en-US/docs/Web/HTML/Global_attributes#attr-title
 	// Note that we are not allowing chars that could close tags like '>'
 	Paragraph = regexp.MustCompile(`^[\p{L}\p{N}\s\-_',\[\]!\./\\\(\)]*$`)
+)
+
+var (
+	// CellAlign handles the `align` attribute
+	// https://developer.mozilla.org/en-US/docs/Web/HTML/Element/td#attr-align
+	cellAlign = [...]string{"center", "justify", "left", "right", "char"}
+
+	// CellVerticalAlign handles the `valign` attribute
+	// https://developer.mozilla.org/en-US/docs/Web/HTML/Element/td#attr-valign
+	cellVerticalAlign = [...]string{"baseline", "bottom", "middle", "top"}
+
+	// Direction handles the `dir` attribute
+	// https://developer.mozilla.org/en-US/docs/Web/HTML/Element/bdo#attr-dir
+	direction = [...]string{"rtl", "ltr"}
+
+	// ImageAlign handles the `align` attribute on the `image` tag
+	// http://www.w3.org/MarkUp/Test/Img/imgtest.html
+	imageAlign = [...]string{
+		"left", "right", "top", "texttop", "middle", "absmiddle", "baseline",
+		"bottom", "absbottom",
+	}
+
+	// ListType encapsulates the common value as well as the latest spec
+	// values for lists
+	// https://developer.mozilla.org/en-US/docs/Web/HTML/Element/ol#attr-type
+	listType = [...]string{"circle", "disc", "square", "a", "i", "1"}
 
 	// dataURIImagePrefix is used by AllowDataURIImages to define the acceptable
 	// prefix of data URIs that contain common web image formats.
@@ -121,9 +123,29 @@ var (
 	// This is not exported as it's not useful by itself, and only has value
 	// within the AllowDataURIImages func
 	dataURIImagePrefix = regexp.MustCompile(
-		`^image/(gif|jpeg|png|svg\+xml|webp);base64,`,
-	)
+		`^image/(gif|jpeg|png|svg\+xml|webp);base64,`)
 )
+
+// CellAlign handles the `align` attribute
+// https://developer.mozilla.org/en-US/docs/Web/HTML/Element/td#attr-align
+func CellAlign() []string { return cellAlign[:] }
+
+// CellVerticalAlign handles the `valign` attribute
+// https://developer.mozilla.org/en-US/docs/Web/HTML/Element/td#attr-valign
+func CellVerticalAlign() []string { return cellVerticalAlign[:] }
+
+// Direction handles the `dir` attribute
+// https://developer.mozilla.org/en-US/docs/Web/HTML/Element/bdo#attr-dir
+func Direction() []string { return direction[:] }
+
+// ImageAlign handles the `align` attribute on the `image` tag
+// http://www.w3.org/MarkUp/Test/Img/imgtest.html
+func ImageAlign() []string { return imageAlign[:] }
+
+// ListType encapsulates the common value as well as the latest spec
+// values for lists
+// https://developer.mozilla.org/en-US/docs/Web/HTML/Element/ol#attr-type
+func ListType() []string { return listType[:] }
 
 // AllowStandardURLs is a convenience function that will enable rel="nofollow"
 // on "a", "area" and "link" (if you have allowed those elements) and will
@@ -149,7 +171,7 @@ func (p *Policy) AllowStandardURLs() {
 func (p *Policy) AllowStandardAttributes() {
 	// "dir" "lang" are permitted as both language attributes affect charsets
 	// and direction of text.
-	p.AllowAttrs("dir").WithValues(Direction[:]...).Globally()
+	p.AllowAttrs("dir").WithValues(Direction()...).Globally()
 	p.AllowAttrs(
 		"lang",
 	).Matching(regexp.MustCompile(`^[a-zA-Z]{2,20}$`)).Globally()
@@ -181,7 +203,7 @@ func (p *Policy) AllowStyling() {
 // images, for that you should also use the AllowDataURIImages() helper.
 func (p *Policy) AllowImages() {
 	// "img" is permitted
-	p.AllowAttrs("align").WithValues(ImageAlign[:]...).OnElements("img")
+	p.AllowAttrs("align").WithValues(ImageAlign()...).OnElements("img")
 	p.AllowAttrs("alt").Matching(Paragraph).OnElements("img")
 	p.AllowAttrs("height", "width").Matching(NumberOrPercent).OnElements("img")
 
@@ -232,10 +254,10 @@ func (p *Policy) AllowDataURIImages() {
 // lists
 func (p *Policy) AllowLists() {
 	// "ol" "ul" are permitted
-	p.AllowAttrs("type").WithValues(ListType[:]...).OnElements("ol", "ul")
+	p.AllowAttrs("type").WithValues(ListType()...).OnElements("ol", "ul")
 
 	// "li" is permitted
-	p.AllowAttrs("type").WithValues(ListType[:]...).OnElements("li")
+	p.AllowAttrs("type").WithValues(ListType()...).OnElements("li")
 	p.AllowAttrs("value").Matching(Integer).OnElements("li")
 
 	// "dl" "dt" "dd" are permitted
@@ -253,23 +275,23 @@ func (p *Policy) AllowTables() {
 	p.AllowElements("caption")
 
 	// "col" "colgroup" are permitted
-	p.AllowAttrs("align").WithValues(CellAlign[:]...).
+	p.AllowAttrs("align").WithValues(CellAlign()...).
 		OnElements("col", "colgroup")
 	p.AllowAttrs("height", "width").Matching(
 		NumberOrPercent,
 	).OnElements("col", "colgroup")
 	p.AllowAttrs("span").Matching(Integer).OnElements("colgroup", "col")
-	p.AllowAttrs("valign").WithValues(CellVerticalAlign[:]...).
+	p.AllowAttrs("valign").WithValues(CellVerticalAlign()...).
 		OnElements("col", "colgroup")
 
 	// "thead" "tr" are permitted
-	p.AllowAttrs("align").WithValues(CellAlign[:]...).OnElements("thead", "tr")
-	p.AllowAttrs("valign").WithValues(CellVerticalAlign[:]...).
+	p.AllowAttrs("align").WithValues(CellAlign()...).OnElements("thead", "tr")
+	p.AllowAttrs("valign").WithValues(CellVerticalAlign()...).
 		OnElements("thead", "tr")
 
 	// "td" "th" are permitted
 	p.AllowAttrs("abbr").Matching(Paragraph).OnElements("td", "th")
-	p.AllowAttrs("align").WithValues(CellAlign[:]...).OnElements("td", "th")
+	p.AllowAttrs("align").WithValues(CellAlign()...).OnElements("td", "th")
 	p.AllowAttrs("colspan", "rowspan").Matching(Integer).OnElements("td", "th")
 	p.AllowAttrs("headers").Matching(
 		SpaceSeparatedTokens,
@@ -282,15 +304,15 @@ func (p *Policy) AllowTables() {
 	).WithValues(
 		"row", "col", "rowgroup", "colgroup",
 	).OnElements("td", "th")
-	p.AllowAttrs("valign").WithValues(CellVerticalAlign[:]...).
+	p.AllowAttrs("valign").WithValues(CellVerticalAlign()...).
 		OnElements("td", "th")
 	p.AllowAttrs("nowrap").WithValues(
 		"", "nowrap",
 	).OnElements("td", "th")
 
 	// "tbody" "tfoot"
-	p.AllowAttrs("align").WithValues(CellAlign[:]...).OnElements("tbody", "tfoot")
-	p.AllowAttrs("valign").WithValues(CellVerticalAlign[:]...).
+	p.AllowAttrs("align").WithValues(CellAlign()...).OnElements("tbody", "tfoot")
+	p.AllowAttrs("valign").WithValues(CellVerticalAlign()...).
 		OnElements("tbody", "tfoot")
 }
 
@@ -304,4 +326,22 @@ func containsHidden(attrs []html.Attribute) bool {
 	return slices.ContainsFunc(attrs, func(a html.Attribute) bool {
 		return a.Key == "hidden" && a.Namespace == ""
 	})
+}
+
+func setAttribute(attrs []html.Attribute, key, val string) []html.Attribute {
+	if _, attr := findAttribute(key, attrs); attr != nil {
+		attr.Val = val
+		return attrs
+	}
+	return append(attrs, html.Attribute{Key: key, Val: val})
+}
+
+func findAttribute(name string, attrs []html.Attribute) (int, *html.Attribute) {
+	i := slices.IndexFunc(attrs, func(a html.Attribute) bool {
+		return a.Key == name && a.Namespace == ""
+	})
+	if i == -1 {
+		return i, nil
+	}
+	return i, &attrs[i]
 }
