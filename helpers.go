@@ -318,7 +318,6 @@ func (p *Policy) AllowTables() {
 
 func (p *Policy) AllowIFrames(vals ...SandboxValue) {
 	p.AllowAttrs("sandbox").OnElements("iframe")
-
 	p.RequireSandboxOnIFrame(vals...)
 }
 

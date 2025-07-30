@@ -76,7 +76,7 @@ type Policy struct {
 	requireCrossOriginAnonymous bool
 
 	// When true, add and filter sandbox attribute on iframe tags
-	requireSandboxOnIFrame map[string]bool
+	requireSandboxOnIFrame map[string]struct{}
 
 	// When true add target="_blank" to fully qualified links
 	// Will add for href="http://foo"
@@ -248,7 +248,7 @@ type urlPolicy func(url *url.URL) (allowUrl bool)
 
 type URLRewriter func(*url.URL)
 
-type SandboxValue int64
+type SandboxValue int
 
 const (
 	SandboxAllowDownloads SandboxValue = iota
@@ -794,51 +794,51 @@ func (p *Policy) AllowURLSchemeWithCustomPolicy(
 // RequireSandboxOnIFrame will result in all iframe tags having a sandbox="" tag
 // Any sandbox values not specified here will be filtered from the generated HTML
 func (p *Policy) RequireSandboxOnIFrame(vals ...SandboxValue) {
-	p.requireSandboxOnIFrame = make(map[string]bool)
+	p.requireSandboxOnIFrame = make(map[string]struct{})
 
 	for _, val := range vals {
 		switch val {
 		case SandboxAllowDownloads:
-			p.requireSandboxOnIFrame["allow-downloads"] = true
+			p.requireSandboxOnIFrame["allow-downloads"] = struct{}{}
 
 		case SandboxAllowDownloadsWithoutUserActivation:
-			p.requireSandboxOnIFrame["allow-downloads-without-user-activation"] = true
+			p.requireSandboxOnIFrame["allow-downloads-without-user-activation"] = struct{}{}
 
 		case SandboxAllowForms:
-			p.requireSandboxOnIFrame["allow-forms"] = true
+			p.requireSandboxOnIFrame["allow-forms"] = struct{}{}
 
 		case SandboxAllowModals:
-			p.requireSandboxOnIFrame["allow-modals"] = true
+			p.requireSandboxOnIFrame["allow-modals"] = struct{}{}
 
 		case SandboxAllowOrientationLock:
-			p.requireSandboxOnIFrame["allow-orientation-lock"] = true
+			p.requireSandboxOnIFrame["allow-orientation-lock"] = struct{}{}
 
 		case SandboxAllowPointerLock:
-			p.requireSandboxOnIFrame["allow-pointer-lock"] = true
+			p.requireSandboxOnIFrame["allow-pointer-lock"] = struct{}{}
 
 		case SandboxAllowPopups:
-			p.requireSandboxOnIFrame["allow-popups"] = true
+			p.requireSandboxOnIFrame["allow-popups"] = struct{}{}
 
 		case SandboxAllowPopupsToEscapeSandbox:
-			p.requireSandboxOnIFrame["allow-popups-to-escape-sandbox"] = true
+			p.requireSandboxOnIFrame["allow-popups-to-escape-sandbox"] = struct{}{}
 
 		case SandboxAllowPresentation:
-			p.requireSandboxOnIFrame["allow-presentation"] = true
+			p.requireSandboxOnIFrame["allow-presentation"] = struct{}{}
 
 		case SandboxAllowSameOrigin:
-			p.requireSandboxOnIFrame["allow-same-origin"] = true
+			p.requireSandboxOnIFrame["allow-same-origin"] = struct{}{}
 
 		case SandboxAllowScripts:
-			p.requireSandboxOnIFrame["allow-scripts"] = true
+			p.requireSandboxOnIFrame["allow-scripts"] = struct{}{}
 
 		case SandboxAllowStorageAccessByUserActivation:
-			p.requireSandboxOnIFrame["allow-storage-access-by-user-activation"] = true
+			p.requireSandboxOnIFrame["allow-storage-access-by-user-activation"] = struct{}{}
 
 		case SandboxAllowTopNavigation:
-			p.requireSandboxOnIFrame["allow-top-navigation"] = true
+			p.requireSandboxOnIFrame["allow-top-navigation"] = struct{}{}
 
 		case SandboxAllowTopNavigationByUserActivation:
-			p.requireSandboxOnIFrame["allow-top-navigation-by-user-activation"] = true
+			p.requireSandboxOnIFrame["allow-top-navigation-by-user-activation"] = struct{}{}
 		}
 	}
 }

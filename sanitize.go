@@ -838,7 +838,8 @@ func (p *Policy) sandboxIframe(attrs []html.Attribute) []html.Attribute {
 
 	values := slices.DeleteFunc(strings.Fields(sandbox.Val),
 		func(s string) bool {
-			return !p.requireSandboxOnIFrame[s]
+			_, ok := p.requireSandboxOnIFrame[s]
+			return !ok
 		})
 	sandbox.Val = strings.Join(values, " ")
 	return attrs
