@@ -129,7 +129,7 @@ type Policy struct {
 	// If srcRewriter is not nil, it is used to rewrite the src attribute
 	// of tags that download resources, such as <img> and <script>.
 	// It requires that the URL is parsable by "net/url" url.Parse().
-	srcRewriter URLRewriter
+	srcRewriter func(*url.URL)
 
 	// If an element has had all attributes removed as a result of a policy
 	// being applied, then the element would be removed from the output.
@@ -174,7 +174,7 @@ type Policy struct {
 	// If urlRewriter is not nil, it is used to rewrite any attribute of tags that
 	// download resources, such as <a> or <img>. It requires that the URL is
 	// parsable by "net/url" url.Parse().
-	urlRewriter func(u *url.URL)
+	urlRewriter func(*url.URL)
 }
 
 type attrPolicy struct {
@@ -245,8 +245,6 @@ type StylePolicyBuilder struct {
 }
 
 type urlPolicy func(url *url.URL) (allowUrl bool)
-
-type URLRewriter func(*url.URL)
 
 type SandboxValue int
 
@@ -656,7 +654,7 @@ func (p *Policy) AllowURLSchemesMatching(r *regexp.Regexp) *Policy {
 // This is a good practise to adopt as it prevents the content from being
 // able to set cookies on the main domain and thus prevents the content on
 // the main domain from being able to read those cookies.
-func (p *Policy) RewriteSrc(fn URLRewriter) *Policy {
+func (p *Policy) RewriteSrc(fn func(*url.URL)) *Policy {
 	p.srcRewriter = fn
 	return p
 }

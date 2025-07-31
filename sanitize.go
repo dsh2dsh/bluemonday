@@ -132,7 +132,7 @@ func (p *Policy) sanitize(r io.Reader, w io.Writer) error {
 		recentlyStartedToken atom.Atom
 	)
 
-	tokenizer := html.NewTokenizer(r)
+	tokenizer := newTokenizer(r)
 	for {
 		if tokenizer.Next() == html.ErrorToken {
 			err := tokenizer.Err()
@@ -144,8 +144,8 @@ func (p *Policy) sanitize(r io.Reader, w io.Writer) error {
 			return fmt.Errorf(genericErrMsg, err)
 		}
 
-		token := tokenizer.Token()
-		switch token.Type {
+		t := tokenizer.Token()
+		switch t.Type {
 		case html.DoctypeToken:
 
 			// DocType is not handled as there is no safe parsing mechanism
@@ -161,7 +161,7 @@ func (p *Policy) sanitize(r io.Reader, w io.Writer) error {
 			// Comments are ignored by default
 			if p.allowComments {
 				// But if allowed then write the comment out as-is
-				if _, err := buff.WriteString(token.String()); err != nil {
+				if _, err := buff.WriteString(t.String()); err != nil {
 					return fmt.Errorf(genericErrMsg, err)
 				}
 			}
@@ -171,7 +171,7 @@ func (p *Policy) sanitize(r io.Reader, w io.Writer) error {
 			if hidden > 0 {
 				hidden++
 				continue
-			} else if containsHidden(token.Attr) {
+			} else if t.Contains("hidden") {
 				hidden++
 				skipElementContent = true
 				if err := p.maybeAddSpaces(buff); err != nil {
@@ -180,19 +180,19 @@ func (p *Policy) sanitize(r io.Reader, w io.Writer) error {
 				continue
 			}
 
-			recentlyStartedToken = token.DataAtom
-			switch token.DataAtom {
+			recentlyStartedToken = t.DataAtom
+			switch t.DataAtom {
 			case atom.Script, atom.Style:
 				if !p.allowUnsafe {
 					continue
 				}
 			}
 
-			aps, ok := p.elsAndAttrs[token.Data]
+			aps, ok := p.elsAndAttrs[t.Data]
 			if !ok {
-				aa := p.matchRegex(token.Data)
+				aa := p.matchRegex(t.Data)
 				if aa == nil {
-					if _, ok := p.setOfElementsToSkipContent[token.Data]; ok {
+					if _, ok := p.setOfElementsToSkipContent[t.Data]; ok {
 						hidden++
 						skipElementContent = true
 					}
@@ -204,12 +204,9 @@ func (p *Policy) sanitize(r io.Reader, w io.Writer) error {
 				aps = aa
 			}
 
-			if len(token.Attr) != 0 {
-				token.Attr = p.sanitizeAttrs(&token, aps)
-			}
-
-			if p.skipToken(&token) {
-				skipClosingTag = append(skipClosingTag, token.Data)
+			p.sanitizeAttrs(t, aps)
+			if p.skipToken(t) {
+				skipClosingTag = append(skipClosingTag, t.Data)
 				if err := p.maybeAddSpaces(buff); err != nil {
 					return err
 				}
@@ -218,14 +215,14 @@ func (p *Policy) sanitize(r io.Reader, w io.Writer) error {
 
 			if skipElementContent {
 				continue
-			} else if _, err := buff.WriteString(token.String()); err != nil {
+			} else if _, err := buff.WriteString(t.String()); err != nil {
 				return fmt.Errorf(genericErrMsg, err)
 			}
 
-			switch token.DataAtom {
+			switch t.DataAtom {
 			case atom.Script, atom.Style:
 			default:
-				if _, ok := p.setOfElementsToSkipContent[token.Data]; ok {
+				if _, ok := p.setOfElementsToSkipContent[t.Data]; ok {
 					skipElementContent = true
 				}
 			}
@@ -243,18 +240,18 @@ func (p *Policy) sanitize(r io.Reader, w io.Writer) error {
 				continue
 			}
 
-			if recentlyStartedToken == token.DataAtom {
+			if recentlyStartedToken == t.DataAtom {
 				recentlyStartedToken = 0
 			}
 
-			switch token.DataAtom {
+			switch t.DataAtom {
 			case atom.Script, atom.Style:
 				if !p.allowUnsafe {
 					continue
 				}
 			}
 
-			if len(skipClosingTag) != 0 && skipClosingTag[len(skipClosingTag)-1] == token.Data {
+			if len(skipClosingTag) != 0 && skipClosingTag[len(skipClosingTag)-1] == t.Data {
 				skipClosingTag = skipClosingTag[:len(skipClosingTag)-1]
 				if err := p.maybeAddSpaces(buff); err != nil {
 					return err
@@ -262,10 +259,10 @@ func (p *Policy) sanitize(r io.Reader, w io.Writer) error {
 				break
 			}
 
-			if _, ok := p.elsAndAttrs[token.Data]; !ok {
+			if _, ok := p.elsAndAttrs[t.Data]; !ok {
 				var match bool
 				for regex := range p.elsMatchingAndAttrs {
-					if regex.MatchString(token.Data) {
+					if regex.MatchString(t.Data) {
 						match = true
 						break
 					}
@@ -278,17 +275,17 @@ func (p *Policy) sanitize(r io.Reader, w io.Writer) error {
 				}
 			}
 
-			switch token.DataAtom {
+			switch t.DataAtom {
 			case atom.Script, atom.Style:
 			default:
-				_, ok := p.setOfElementsToSkipContent[token.Data]
+				_, ok := p.setOfElementsToSkipContent[t.Data]
 				if skipElementContent && ok {
 					skipElementContent = false
 				}
 			}
 
 			if !skipElementContent {
-				if _, err := buff.WriteString(token.String()); err != nil {
+				if _, err := buff.WriteString(t.String()); err != nil {
 					return fmt.Errorf(genericErrMsg, err)
 				}
 			}
@@ -299,16 +296,16 @@ func (p *Policy) sanitize(r io.Reader, w io.Writer) error {
 				continue
 			}
 
-			switch token.DataAtom {
+			switch t.DataAtom {
 			case atom.Script, atom.Style:
 				if !p.allowUnsafe {
 					continue
 				}
 			}
 
-			aps, ok := p.elsAndAttrs[token.Data]
+			aps, ok := p.elsAndAttrs[t.Data]
 			if !ok {
-				aa := p.matchRegex(token.Data)
+				aa := p.matchRegex(t.Data)
 				if aa == nil {
 					if err := p.maybeAddSpaces(buff); err != nil {
 						return err
@@ -318,11 +315,8 @@ func (p *Policy) sanitize(r io.Reader, w io.Writer) error {
 				aps = aa
 			}
 
-			if len(token.Attr) != 0 {
-				token.Attr = p.sanitizeAttrs(&token, aps)
-			}
-
-			if p.skipToken(&token) {
+			p.sanitizeAttrs(t, aps)
+			if p.skipToken(t) {
 				if err := p.maybeAddSpaces(buff); err != nil {
 					return err
 				}
@@ -330,7 +324,7 @@ func (p *Policy) sanitize(r io.Reader, w io.Writer) error {
 			}
 
 			if !skipElementContent {
-				if _, err := buff.WriteString(token.String()); err != nil {
+				if _, err := buff.WriteString(t.String()); err != nil {
 					return fmt.Errorf(genericErrMsg, err)
 				}
 			}
@@ -348,20 +342,20 @@ func (p *Policy) sanitize(r io.Reader, w io.Writer) error {
 				//
 				// requires p.AllowUnsafe()
 				if p.allowUnsafe {
-					if _, err := buff.WriteString(token.Data); err != nil {
+					if _, err := buff.WriteString(t.Data); err != nil {
 						return fmt.Errorf(genericErrMsg, err)
 					}
 				}
 			default:
 				// HTML escape the text
-				if _, err := buff.WriteString(token.String()); err != nil {
+				if _, err := buff.WriteString(t.String()); err != nil {
 					return fmt.Errorf(genericErrMsg, err)
 				}
 			}
 
 		default:
 			// A token that didn't exist in the html package when we wrote this
-			return fmt.Errorf("bluemonday: unknown token: %v", token)
+			return fmt.Errorf("bluemonday: unknown token: %v", t)
 		}
 	}
 }
@@ -379,33 +373,29 @@ func (p *Policy) maybeAddSpaces(buff io.StringWriter) error {
 
 // sanitizeAttrs takes a set of element attribute policies and the global
 // attribute policies and applies them to the []html.Attribute returning a set
-// of html.Attributes that match the policies
-func (p *Policy) sanitizeAttrs(t *html.Token, aps map[string][]attrPolicy,
-) []html.Attribute {
+// of html.Attributes that match the policies.
+func (p *Policy) sanitizeAttrs(t *token, aps map[string][]attrPolicy) {
 	attrs := p.modifyTokenAttr(t)
-
 	if len(attrs) == 0 {
-		return attrs
+		return
 	}
 
 	// Builds a new attribute slice based on the whether the attribute has been
 	// allowed explicitly or globally.
-	cleanAttrs := attrs[:0]
-
 attrsLoop:
-	for i := range attrs {
-		attr := &attrs[i]
+	for i, attr := range attrs {
 		if p.allowDataAttributes && dataAttribute(attr.Key) {
 			// If we see a data attribute, let it through.
-			cleanAttrs = append(cleanAttrs, *attr)
+			t.Append(attr)
 			continue attrsLoop
 		}
 
 		// Is this a "style" attribute, and if so, do we need to sanitize it?
 		if attr.Key == "style" && p.hasStylePolicies(t.Data) {
+			attr := &attrs[i]
 			p.sanitizeStyles(attr, t.Data)
 			if attr.Val != "" {
-				cleanAttrs = append(cleanAttrs, *attr)
+				t.Append(*attr)
 			}
 			// We've sanitized away any and all styles; don't bother to
 			// output the style attribute (even if it's allowed)
@@ -416,7 +406,7 @@ attrsLoop:
 		if apl, ok := aps[attr.Key]; ok {
 			for _, ap := range apl {
 				if ap.Match(attr.Val) {
-					cleanAttrs = append(cleanAttrs, *attr)
+					t.Append(attr)
 					continue attrsLoop
 				}
 			}
@@ -426,42 +416,40 @@ attrsLoop:
 		if apl, ok := p.globalAttrs[attr.Key]; ok {
 			for _, ap := range apl {
 				if ap.Match(attr.Val) {
-					cleanAttrs = append(cleanAttrs, *attr)
+					t.Append(attr)
 					continue attrsLoop
 				}
 			}
 		}
 	}
 
-	if len(cleanAttrs) == 0 {
+	if len(t.Attr) == 0 {
 		// If nothing was allowed, let's get out of here
-		return cleanAttrs
+		return
 	}
 	// cleanAttrs now contains the attributes that are permitted
 
 	if linkable(t) {
-		cleanAttrs = p.sanitizeLinkable(t, cleanAttrs)
+		p.sanitizeLinkable(t)
 	}
 
 	switch t.DataAtom {
 	case atom.Audio, atom.Img, atom.Link, atom.Script, atom.Video:
-		if p.requireCrossOriginAnonymous && len(cleanAttrs) > 0 {
-			cleanAttrs = setAttribute(cleanAttrs, "crossorigin", "anonymous")
+		if p.requireCrossOriginAnonymous && len(t.Attr) > 0 {
+			t.Set("crossorigin", "anonymous")
 		}
 	case atom.Iframe:
 		if len(p.requireSandboxOnIFrame) != 0 {
-			cleanAttrs = p.sandboxIframe(cleanAttrs)
+			p.sandboxIframe(t)
 		}
 	}
-	return cleanAttrs
 }
 
-func (p *Policy) modifyTokenAttr(t *html.Token) []html.Attribute {
-	attrs := t.Attr
+func (p *Policy) modifyTokenAttr(t *token) []html.Attribute {
 	if p.callbackAttr != nil {
-		attrs = p.callbackAttr(t)
+		t.Attr = p.callbackAttr(&t.Token)
 	}
-	return attrs
+	return t.Reset()
 }
 
 func dataAttribute(val string) bool {
@@ -483,7 +471,7 @@ func dataAttribute(val string) bool {
 	return !dataInvalidChars.MatchString(rest)
 }
 
-func linkable(t *html.Token) bool {
+func linkable(t *token) bool {
 	switch t.DataAtom {
 	case atom.A, atom.Area, atom.Base, atom.Link:
 		// elements that allow .href
@@ -499,19 +487,17 @@ func linkable(t *html.Token) bool {
 	return false
 }
 
-func (p *Policy) sanitizeLinkable(t *html.Token, attrs []html.Attribute,
-) []html.Attribute {
+func (p *Policy) sanitizeLinkable(t *token) {
 	var href *url.URL
 	if p.requireParseableURLs {
-		if href, attrs = p.validateURLs(t, attrs); href == nil {
-			return attrs
+		if href = p.validateURLs(t); href == nil {
+			return
 		}
 	}
 
 	if p.requireRelTargetBlank() {
-		attrs = p.addRelTargetBlank(t, href, attrs)
+		p.addRelTargetBlank(t, href)
 	}
-	return attrs
 }
 
 // validateURLs ensures URLs are parseable:
@@ -522,54 +508,55 @@ func (p *Policy) sanitizeLinkable(t *html.Token, attrs []html.Attribute,
 // - q.cite
 // - img.src
 // - script.src
-func (p *Policy) validateURLs(t *html.Token, attrs []html.Attribute,
-) (href *url.URL, _ []html.Attribute) {
+func (p *Policy) validateURLs(t *token) (href *url.URL) {
 	switch t.DataAtom {
 	case atom.A, atom.Area, atom.Base, atom.Link:
-		href, attrs = p.deleteInvalidURL("href", attrs)
+		href = p.deleteInvalidURL(t, "href")
 
 	case atom.Blockquote, atom.Del, atom.Ins, atom.Q:
-		_, attrs = p.deleteInvalidURL("cite", attrs)
+		p.deleteInvalidURL(t, "cite")
 
 	case atom.Audio, atom.Embed, atom.Iframe, atom.Script, atom.Track:
-		_, attrs = p.deleteInvalidURL("src", attrs, p.rewriteSrc)
+		p.deleteInvalidURL(t, "src", p.rewriteSrc)
 
 	case atom.Img, atom.Source:
-		src, attrs2 := p.deleteInvalidURL("src", attrs, p.rewriteSrc)
-		attrs2, srcSetOk := p.sanitizeSrcSet(attrs2)
-		if src == nil && !srcSetOk {
-			return nil, nil
+		src := p.deleteInvalidURL(t, "src", p.rewriteSrc)
+		srcsetOk := p.sanitizeSrcSet(t)
+		if src == nil && !srcsetOk {
+			t.Reset()
+			return nil
 		}
-		attrs = attrs2
 
 	case atom.Video:
-		_, attrs = p.deleteInvalidURL("poster", attrs, p.rewriteSrc)
-		_, attrs = p.deleteInvalidURL("src", attrs, p.rewriteSrc)
+		p.deleteInvalidURL(t, "poster", p.rewriteSrc)
+		p.deleteInvalidURL(t, "src", p.rewriteSrc)
 	}
-	return href, attrs
+	return href
 }
 
-func (p *Policy) deleteInvalidURL(name string, attrs []html.Attribute,
+func (p *Policy) deleteInvalidURL(t *token, name string,
 	rewriters ...func(*url.URL) *url.URL,
-) (*url.URL, []html.Attribute) {
-	i, attr := findAttribute(name, attrs)
+) *url.URL {
+	attr := t.Ref(name)
 	if attr == nil {
-		return nil, attrs
+		return nil
 	}
 
 	u := p.validURL(attr.Val)
 	if u == nil {
-		return nil, slices.Delete(attrs, i, i+1)
+		t.Delete(name)
+		return nil
 	}
 
 	for _, fn := range rewriters {
 		if u = fn(u); u == nil {
-			return nil, slices.Delete(attrs, i, i+1)
+			t.Delete(name)
+			return nil
 		}
 	}
 
 	attr.Val = u.String()
-	return u, attrs
+	return u
 }
 
 func (p *Policy) validURL(rawurl string) *url.URL {
@@ -645,15 +632,17 @@ func (p *Policy) rewriteSrc(u *url.URL) *url.URL {
 	return u
 }
 
-func (p *Policy) sanitizeSrcSet(attrs []html.Attribute) ([]html.Attribute, bool) {
-	i, attr := findAttribute("srcset", attrs)
+func (p *Policy) sanitizeSrcSet(t *token) bool {
+	const srcset = "srcset"
+	attr := t.Ref(srcset)
 	if attr == nil {
-		return attrs, false
+		return false
 	}
 
 	images := p.parseSrcSetAttribute(attr.Val)
 	if len(images) == 0 {
-		return slices.Delete(attrs, i, i+1), false
+		t.Delete(srcset)
+		return false
 	}
 
 	var removed int
@@ -665,18 +654,20 @@ func (p *Policy) sanitizeSrcSet(attrs []html.Attribute) ([]html.Attribute, bool)
 	}
 
 	if removed == len(images) {
-		return slices.Delete(attrs, i, i+1), false
+		t.Delete(srcset)
+		return false
 	} else if removed > 0 {
 		images = slices.DeleteFunc(images, func(img *imageCandidate) bool {
 			return img.ImageURL == ""
 		})
 		if len(images) == 0 {
-			return slices.Delete(attrs, i, i+1), false
+			t.Delete(srcset)
+			return false
 		}
 	}
 
 	attr.Val = images.String()
-	return attrs, true
+	return true
 }
 
 func (p *Policy) requireRelTargetBlank() bool {
@@ -687,14 +678,11 @@ func (p *Policy) requireRelTargetBlank() bool {
 		p.addTargetBlankToFullyQualifiedLinks
 }
 
-func (p *Policy) addRelTargetBlank(t *html.Token, href *url.URL,
-	attrs []html.Attribute,
-) []html.Attribute {
-	externalLink, ok := externalLink(href, attrs)
+func (p *Policy) addRelTargetBlank(t *token, href *url.URL) {
+	external, ok := externalLink(href, t)
 	if !ok {
-		return attrs
+		return
 	}
-	attrs = slices.Grow(attrs, 2)
 
 	var noopener bool
 	if t.DataAtom == atom.A {
@@ -705,21 +693,21 @@ func (p *Policy) addRelTargetBlank(t *html.Token, href *url.URL,
 		//
 		// To mitigate this risk, we need to add a specific rel attribute if it is
 		// not already present: rel="noopener".
-		attrs, noopener = p.setTargetAttr(attrs,
-			externalLink && p.addTargetBlankToFullyQualifiedLinks)
+		noopener = p.setTargetAttr(t,
+			external && p.addTargetBlankToFullyQualifiedLinks)
 	}
 
-	return p.setRelAttr(attrs,
+	p.setRelAttr(t,
 		p.requireNoFollow ||
-			(externalLink && p.requireNoFollowFullyQualifiedLinks),
+			(external && p.requireNoFollowFullyQualifiedLinks),
 		p.requireNoReferrer ||
-			(externalLink && p.requireNoReferrerFullyQualifiedLinks),
+			(external && p.requireNoReferrerFullyQualifiedLinks),
 		noopener)
 }
 
-func externalLink(href *url.URL, attrs []html.Attribute) (bool, bool) {
+func externalLink(href *url.URL, t *token) (bool, bool) {
 	if href == nil {
-		_, attr := findAttribute("href", attrs)
+		attr := t.Ref("href")
 		if attr == nil {
 			return false, false
 		}
@@ -732,30 +720,28 @@ func externalLink(href *url.URL, attrs []html.Attribute) (bool, bool) {
 	return href.IsAbs() || href.Hostname() != "", true
 }
 
-func (p *Policy) setTargetAttr(attrs []html.Attribute, required bool,
-) ([]html.Attribute, bool) {
+func (p *Policy) setTargetAttr(t *token, required bool) bool {
 	const target, blank = "target", "_blank"
-	_, attr := findAttribute(target, attrs)
+	attr := t.Ref(target)
+
 	if required {
 		if attr != nil {
 			attr.Val = blank
 		} else {
-			attrs = append(attrs, html.Attribute{Key: target, Val: blank})
+			t.Append(html.Attribute{Key: target, Val: blank})
 		}
-		return attrs, true
+		return true
 	}
 
 	if attr == nil {
-		return attrs, false
+		return false
 	}
-	return attrs, attr.Val == blank
+	return attr.Val == blank
 }
 
-func (p *Policy) setRelAttr(attrs []html.Attribute, nofollow, noreferrer,
-	noopener bool,
-) []html.Attribute {
+func (p *Policy) setRelAttr(t *token, nofollow, noreferrer, noopener bool) {
 	if !nofollow && !noreferrer && !noopener {
-		return attrs
+		return
 	}
 
 	value := func() string {
@@ -772,12 +758,13 @@ func (p *Policy) setRelAttr(attrs []html.Attribute, nofollow, noreferrer,
 		return strings.Join(values, " ")
 	}
 
-	_, attr := findAttribute("rel", attrs)
+	const rel = "rel"
+	attr := t.Ref(rel)
 	if attr == nil {
-		return append(attrs, html.Attribute{Key: "rel", Val: value()})
+		attr = t.Append(html.Attribute{Key: rel, Val: value()})
 	} else if attr.Val == "" {
 		attr.Val = value()
-		return attrs
+		return
 	}
 
 	for s := range strings.FieldsSeq(attr.Val) {
@@ -791,14 +778,12 @@ func (p *Policy) setRelAttr(attrs []html.Attribute, nofollow, noreferrer,
 		}
 	}
 	if !nofollow && !noreferrer && !noopener {
-		return attrs
+		return
 	}
-
 	attr.Val += " " + value()
-	return attrs
 }
 
-func (p *Policy) skipToken(t *html.Token) bool {
+func (p *Policy) skipToken(t *token) bool {
 	return len(t.Attr) == 0 && !p.allowNoAttrs(t.Data)
 }
 
@@ -830,17 +815,18 @@ func (p *Policy) matchRegex(elementName string) (aps map[string][]attrPolicy) {
 	return aps
 }
 
-func (p *Policy) sandboxIframe(attrs []html.Attribute) []html.Attribute {
-	_, sandbox := findAttribute("sandbox", attrs)
-	if sandbox == nil {
-		return append(attrs, html.Attribute{Key: "sandbox"})
+func (p *Policy) sandboxIframe(t *token) {
+	const sandbox = "sandbox"
+	attr := t.Ref(sandbox)
+	if attr == nil {
+		t.Append(html.Attribute{Key: sandbox})
+		return
 	}
 
-	values := slices.DeleteFunc(strings.Fields(sandbox.Val),
+	values := slices.DeleteFunc(strings.Fields(attr.Val),
 		func(s string) bool {
 			_, ok := p.requireSandboxOnIFrame[s]
 			return !ok
 		})
-	sandbox.Val = strings.Join(values, " ")
-	return attrs
+	attr.Val = strings.Join(values, " ")
 }

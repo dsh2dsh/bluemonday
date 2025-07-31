@@ -35,6 +35,7 @@ import (
 	"encoding/base64"
 	"net/url"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -4134,6 +4135,16 @@ func TestCallbackForAttributes(t *testing.T) {
 	for _, tt := range tests {
 		assert.Equal(t, tt.expected, p.Sanitize(tt.in))
 	}
+}
+
+func findAttribute(name string, attrs []html.Attribute) (int, *html.Attribute) {
+	i := slices.IndexFunc(attrs, func(a html.Attribute) bool {
+		return a.Key == name && a.Namespace == ""
+	})
+	if i == -1 {
+		return i, nil
+	}
+	return i, &attrs[i]
 }
 
 func TestRewriteURL(t *testing.T) {
