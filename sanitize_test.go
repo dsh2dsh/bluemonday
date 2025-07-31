@@ -53,7 +53,10 @@ var wikipediaHTML string
 
 func BenchmarkSanitize(b *testing.B) {
 	inputs := []string{githubHTML, wikipediaHTML}
-	p := UGCPolicy()
+
+	p := UGCPolicy().
+		AddTargetBlankToFullyQualifiedLinks(true).
+		RequireNoReferrerOnLinks(true)
 
 	b.ReportAllocs()
 	for b.Loop() {
