@@ -10,12 +10,21 @@ type imageCandidates []*imageCandidate
 
 // parseSrcSetAttribute returns the list of image candidates from the set.
 // https://html.spec.whatwg.org/#parse-a-srcset-attribute
-func (self *Policy) parseSrcSetAttribute(attr string) imageCandidates {
+func (self *Policy) parseSrcSetAttribute(t *token, attr string,
+) imageCandidates {
 	n := strings.Count(attr, ", ")
 	images := make(imageCandidates, 0, n+1)
 
+	urlParser := func(s string) *url.URL {
+		u := self.validURL(t, s)
+		if u == nil {
+			return u
+		}
+		return self.rewriteSrc(u)
+	}
+
 	for value := range strings.SplitSeq(attr, ", ") {
-		if image := parseImageCandidate(value, self.validURL); image != nil {
+		if image := parseImageCandidate(value, urlParser); image != nil {
 			images = append(images, image)
 		}
 	}

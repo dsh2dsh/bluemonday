@@ -4188,18 +4188,14 @@ func TestRewriteURL(t *testing.T) {
 
 	p.AllowAttrs("poster").OnElements("video")
 
-	p.RewriteURL(func(u *url.URL) {
+	p.RewriteTokenURL(func(_ *html.Token, u *url.URL) *url.URL {
 		if u.IsAbs() {
-			return
+			return u
 		}
-
 		if u.EscapedPath() == "removeme.gif" {
-			*u = url.URL{}
-			return
+			return nil
 		}
-
-		u2 := pageURL.ResolveReference(u)
-		*u = *u2
+		return pageURL.ResolveReference(u)
 	})
 
 	for _, tt := range tests {
@@ -4315,12 +4311,11 @@ func TestSrcSet(t *testing.T) {
 	require.NoError(t, err)
 
 	p := UGCPolicy().AllowAttrs("src", "srcset").OnElements("source")
-	p.RewriteURL(func(u *url.URL) {
+	p.RewriteTokenURL(func(_ *html.Token, u *url.URL) *url.URL {
 		if u.IsAbs() {
-			return
+			return u
 		}
-		u2 := pageURL.ResolveReference(u)
-		*u = *u2
+		return pageURL.ResolveReference(u)
 	})
 
 	p.RewriteSrc(func(u *url.URL) {

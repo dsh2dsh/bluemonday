@@ -174,7 +174,7 @@ type Policy struct {
 	// If urlRewriter is not nil, it is used to rewrite any attribute of tags that
 	// download resources, such as <a> or <img>. It requires that the URL is
 	// parsable by "net/url" url.Parse().
-	urlRewriter func(*url.URL)
+	urlRewriter func(*html.Token, *url.URL) *url.URL
 
 	setAttrs map[string][]html.Attribute
 }
@@ -316,11 +316,27 @@ func (p *Policy) SetCallbackForAttributes(cb func(*html.Token) []html.Attribute,
 	return p
 }
 
-// RewriteURL will rewrite any attribute of a resource downloading tag
+// RewriteTokenURL will rewrite any attribute of a resource downloading tag
 // (e.g. <a>, <img>, <script>, <iframe>) using the provided function.
-func (p *Policy) RewriteURL(fn func(u *url.URL)) *Policy {
+func (p *Policy) RewriteTokenURL(fn func(*html.Token, *url.URL) *url.URL,
+) *Policy {
 	p.urlRewriter = fn
 	return p
+}
+
+// RewriteURL will rewrite any attribute of a resource downloading tag
+// (e.g. <a>, <img>, <script>, <iframe>) using the provided function.
+//
+// Deprecated: Use RewriteTokenURL instead.
+func (p *Policy) RewriteURL(fn func(*url.URL)) *Policy {
+	return p.RewriteTokenURL(func(_ *html.Token, u *url.URL) *url.URL {
+		fn(u)
+		var empty url.URL
+		if *u == empty {
+			return nil
+		}
+		return u
+	})
 }
 
 // AllowAttrs takes a range of HTML attribute names and returns an

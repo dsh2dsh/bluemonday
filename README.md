@@ -12,24 +12,22 @@ This project is a fork of bluemonday. Changes from
 
 * Rewriting URL of any attribute of a resource downloading tags
 
-  `RewriteURL()` will rewrite any attribute of a resource downloading tag (e.g.
-  `<a>`, `<img>`, `<script>`, `<iframe>`) using the provided function. Like:
+  `RewriteTokenURL()` will rewrite any attribute of a resource downloading tag
+  (e.g. `<a>`, `<img>`, `<script>`, `<iframe>`) using the provided function.
+  Example:
 
   ```go
-  p.RewriteURL(func(u *url.URL) {
+  p.RewriteTokenURL(func(_ *html.Token, u *url.URL) *url.URL {
     if u.IsAbs() {
-      return
+      return u
     }
-    u2 := pageURL.ResolveReference(u)
-    *u = *u2
+    return pageURL.ResolveReference(u)
   })
   ```
 
-  An URL attribute can be removed by assigning it empty `url.URL` value, like:
+  An URL attribute can be removed by returning `nil`.
 
-  ```go
-  *u = url.URL{}
-  ```
+  `RewriteURL` is deprecated, but still works.
 
 * Handle more properties as URLs
 

@@ -540,8 +540,14 @@ func (p *Policy) validateURLs(t *token) (href *url.URL) {
 	case atom.Blockquote, atom.Del, atom.Ins, atom.Q:
 		p.deleteInvalidURL(t, "cite")
 
-	case atom.Audio, atom.Embed, atom.Iframe, atom.Script, atom.Track:
+	case atom.Audio, atom.Embed, atom.Script, atom.Track:
 		p.deleteInvalidURL(t, "src", p.rewriteSrc)
+
+	case atom.Iframe:
+		if src := p.deleteInvalidURL(t, "src", p.rewriteSrc); src == nil {
+			t.Reset()
+			return nil
+		}
 
 	case atom.Img, atom.Source:
 		src := p.deleteInvalidURL(t, "src", p.rewriteSrc)
@@ -566,7 +572,7 @@ func (p *Policy) deleteInvalidURL(t *token, name string,
 		return nil
 	}
 
-	u := p.validURL(attr.Val)
+	u := p.validURL(t, attr.Val)
 	if u == nil {
 		t.Delete(name)
 		return nil
@@ -583,7 +589,7 @@ func (p *Policy) deleteInvalidURL(t *token, name string,
 	return u
 }
 
-func (p *Policy) validURL(rawurl string) *url.URL {
+func (p *Policy) validURL(t *token, rawurl string) *url.URL {
 	// URLs are valid if when space is trimmed the URL is valid
 	rawurl = strings.TrimSpace(rawurl)
 
@@ -605,7 +611,7 @@ func (p *Policy) validURL(rawurl string) *url.URL {
 
 	if !u.IsAbs() {
 		if p.allowRelativeURLs && rawurl != "" {
-			return p.rewriteURL(u)
+			return p.rewriteURL(t, u)
 		}
 		return nil
 	}
@@ -614,27 +620,27 @@ func (p *Policy) validURL(rawurl string) *url.URL {
 	if !ok {
 		for _, r := range p.allowURLSchemeRegexps {
 			if r.MatchString(u.Scheme) {
-				return p.rewriteURL(u)
+				return p.rewriteURL(t, u)
 			}
 		}
 		return nil
 	}
 
 	if len(urlPolicies) == 0 {
-		return p.rewriteURL(u)
+		return p.rewriteURL(t, u)
 	}
 
 	for _, urlPolicy := range urlPolicies {
 		if urlPolicy(u) {
-			return p.rewriteURL(u)
+			return p.rewriteURL(t, u)
 		}
 	}
 	return nil
 }
 
-func (p *Policy) rewriteURL(u *url.URL) *url.URL {
+func (p *Policy) rewriteURL(t *token, u *url.URL) *url.URL {
 	if p.urlRewriter != nil {
-		p.urlRewriter(u)
+		return p.urlRewriter(&t.Token, u)
 	}
 
 	var empty url.URL
@@ -663,7 +669,7 @@ func (p *Policy) sanitizeSrcSet(t *token) bool {
 		return false
 	}
 
-	images := p.parseSrcSetAttribute(attr.Val)
+	images := p.parseSrcSetAttribute(t, attr.Val)
 	if len(images) == 0 {
 		t.Delete(srcset)
 		return false
