@@ -6,32 +6,34 @@ import (
 	"strings"
 )
 
-type imageCandidates []*imageCandidate
+type ImageCandidates []ImageCandidate
 
-// parseSrcSetAttribute returns the list of image candidates from the set.
+// ParseSrcSetAttribute returns the list of image candidates from the set.
 // https://html.spec.whatwg.org/#parse-a-srcset-attribute
-func (self *Policy) parseSrcSetAttribute(t *token, attr string,
-) imageCandidates {
-	n := strings.Count(attr, ", ")
-	images := make(imageCandidates, 0, n+1)
-
-	urlParser := func(s string) *url.URL {
-		u := self.validURL(t, s)
-		if u == nil {
-			return u
+func ParseSrcSetAttribute(attr string) ImageCandidates {
+	return parseSrcSetAttribute(attr, func(s string) *url.URL {
+		u, err := url.Parse(s)
+		if err != nil {
+			return nil
 		}
-		return self.rewriteSrc(u)
-	}
+		return u
+	})
+}
+
+func parseSrcSetAttribute(attr string, urlParser func(string) *url.URL,
+) ImageCandidates {
+	n := strings.Count(attr, ", ")
+	images := make(ImageCandidates, 0, n+1)
 
 	for value := range strings.SplitSeq(attr, ", ") {
-		if image := parseImageCandidate(value, urlParser); image != nil {
+		if image := parseImageCandidate(value, urlParser); image.valid {
 			images = append(images, image)
 		}
 	}
 	return images
 }
 
-func (c imageCandidates) String() string {
+func (c ImageCandidates) String() string {
 	htmlCandidates := make([]string, len(c))
 	for i, imageCandidate := range c {
 		htmlCandidates[i] = imageCandidate.String()
@@ -39,21 +41,21 @@ func (c imageCandidates) String() string {
 	return strings.Join(htmlCandidates, ", ")
 }
 
-type imageCandidate struct {
+type ImageCandidate struct {
 	ImageURL   string
 	Descriptor string
 
-	url *url.URL
+	valid bool
 }
 
 func parseImageCandidate(input string, urlParser func(string) *url.URL,
-) *imageCandidate {
+) ImageCandidate {
 	imageURL, descr, _ := strings.Cut(strings.TrimSpace(input), " ")
 	u := urlParser(imageURL)
 	if u == nil || !validWidthDensity(descr) {
-		return nil
+		return ImageCandidate{}
 	}
-	return &imageCandidate{ImageURL: u.String(), Descriptor: descr, url: u}
+	return ImageCandidate{ImageURL: u.String(), Descriptor: descr, valid: true}
 }
 
 func validWidthDensity(value string) bool {
@@ -72,11 +74,9 @@ func validWidthDensity(value string) bool {
 	return err == nil
 }
 
-func (self *imageCandidate) String() string {
+func (self *ImageCandidate) String() string {
 	if self.Descriptor == "" {
 		return self.ImageURL
 	}
 	return self.ImageURL + " " + self.Descriptor
 }
-
-func (self *imageCandidate) URL() *url.URL { return self.url }

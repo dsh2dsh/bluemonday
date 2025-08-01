@@ -58,6 +58,9 @@ This project is a fork of bluemonday. Changes from
   `UGCPolicy()` allows `srcset` on `img` elements. `source` still isn't allowed
   by default.
 
+  Public function `ParseSrcSetAttribute` returns the list of image candidates
+  from the set.
+
 * `SetAttr` policy, which sets attributes on elements
 
   `SetAttr` says that HTML attribute with name and value must be added to

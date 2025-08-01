@@ -675,29 +675,20 @@ func (p *Policy) sanitizeSrcSet(t *token) bool {
 		return false
 	}
 
-	var removed int
-	for _, img := range images {
-		if u := p.rewriteSrc(img.URL()); u == nil {
-			removed++
-			img.ImageURL = ""
-		}
-	}
-
-	if removed == len(images) {
-		t.Delete(srcset)
-		return false
-	} else if removed > 0 {
-		images = slices.DeleteFunc(images, func(img *imageCandidate) bool {
-			return img.ImageURL == ""
-		})
-		if len(images) == 0 {
-			t.Delete(srcset)
-			return false
-		}
-	}
-
 	attr.Val = images.String()
 	return true
+}
+
+func (self *Policy) parseSrcSetAttribute(t *token, attr string,
+) ImageCandidates {
+	urlParser := func(s string) *url.URL {
+		u := self.validURL(t, s)
+		if u == nil {
+			return u
+		}
+		return self.rewriteSrc(u)
+	}
+	return parseSrcSetAttribute(attr, urlParser)
 }
 
 func (p *Policy) requireRelTargetBlank() bool {
