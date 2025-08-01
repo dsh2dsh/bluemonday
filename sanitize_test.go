@@ -4335,3 +4335,21 @@ func TestSrcSet(t *testing.T) {
 		})
 	}
 }
+
+func TestSetAttr(t *testing.T) {
+	p := NewPolicy().AllowAttrs("src").OnElements("img").
+		SetAttr("loading", "lazy").OnElements("img")
+
+	input := `<img src="giraffe.gif"/>`
+	expected := `<img src="giraffe.gif" loading="lazy"/>`
+	assert.Equal(t, expected, p.Sanitize(input))
+
+	input = `<img src="giraffe.gif" loading="lazy"/>`
+	assert.Equal(t, input, p.Sanitize(input))
+
+	p.AllowAttrs("loading", "lazy").OnElements("img")
+	assert.Equal(t, input, p.Sanitize(input))
+
+	input = `<img src="giraffe.gif" loading="eager"/>`
+	assert.Equal(t, expected, p.Sanitize(input))
+}

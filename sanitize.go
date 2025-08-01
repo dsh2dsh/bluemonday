@@ -382,52 +382,27 @@ func (p *Policy) sanitizeAttrs(t *token, aps map[string][]attrPolicy) {
 
 	// Builds a new attribute slice based on the whether the attribute has been
 	// allowed explicitly or globally.
-attrsLoop:
-	for i, attr := range attrs {
-		if p.allowDataAttributes && dataAttribute(attr.Key) {
-			// If we see a data attribute, let it through.
-			t.Append(attr)
-			continue attrsLoop
-		}
-
+	for _, attr := range attrs {
+		switch {
+		// If we see a data attribute, let it through.
+		case p.matchDataAttribute(t, attr):
 		// Is this a "style" attribute, and if so, do we need to sanitize it?
-		if attr.Key == "style" && p.hasStylePolicies(t.Data) {
-			attr := &attrs[i]
-			p.sanitizeStyles(attr, t.Data)
-			if attr.Val != "" {
-				t.Append(*attr)
-			}
-			// We've sanitized away any and all styles; don't bother to
-			// output the style attribute (even if it's allowed)
-			continue attrsLoop
+		case p.matchStylePolicy(t, attr):
+		default:
+			// Is there a policy that applies?
+			p.matchPolicy(t, attr, aps)
 		}
+	}
 
-		// Is there an element specific attribute policy that applies?
-		if apl, ok := aps[attr.Key]; ok {
-			for _, ap := range apl {
-				if ap.Match(attr.Val) {
-					t.Append(attr)
-					continue attrsLoop
-				}
-			}
-		}
-
-		// Is there a global attribute policy that applies?
-		if apl, ok := p.globalAttrs[attr.Key]; ok {
-			for _, ap := range apl {
-				if ap.Match(attr.Val) {
-					t.Append(attr)
-					continue attrsLoop
-				}
-			}
-		}
+	if attrs, ok := p.setAttrs[t.Data]; ok {
+		t.SetAttrs(attrs)
 	}
 
 	if len(t.Attr) == 0 {
 		// If nothing was allowed, let's get out of here
 		return
 	}
-	// cleanAttrs now contains the attributes that are permitted
+	// t.Attr now contains the attributes that are permitted
 
 	if linkable(t) {
 		p.sanitizeLinkable(t)
@@ -452,6 +427,15 @@ func (p *Policy) modifyTokenAttr(t *token) []html.Attribute {
 	return t.Reset()
 }
 
+func (p *Policy) matchDataAttribute(t *token, attr html.Attribute) bool {
+	if !p.allowDataAttributes || !dataAttribute(attr.Key) {
+		return false
+	}
+	// If we see a data attribute, let it through.
+	t.Append(attr)
+	return true
+}
+
 func dataAttribute(val string) bool {
 	if !strings.HasPrefix(val, "data-") {
 		return false
@@ -469,6 +453,46 @@ func dataAttribute(val string) bool {
 
 	// no uppercase or semi-colons allowed.
 	return !dataInvalidChars.MatchString(rest)
+}
+
+func (p *Policy) matchStylePolicy(t *token, attr html.Attribute) bool {
+	// Is this a "style" attribute, and if so, do we need to sanitize it?
+	if attr.Key != "style" || !p.hasStylePolicies(t.Data) {
+		return false
+	}
+
+	p.sanitizeStyles(&attr, t.Data)
+	if attr.Val != "" {
+		t.Append(attr)
+	}
+	// We've sanitized away any and all styles; don't bother to
+	// output the style attribute (even if it's allowed)
+	return true
+}
+
+func (p *Policy) matchPolicy(t *token, attr html.Attribute,
+	aps map[string][]attrPolicy,
+) bool {
+	// Is there an element specific attribute policy that applies?
+	if apl, ok := aps[attr.Key]; ok {
+		for _, ap := range apl {
+			if ap.Match(attr.Val) {
+				t.Append(attr)
+				return true
+			}
+		}
+	}
+
+	// Is there a global attribute policy that applies?
+	if apl, ok := p.globalAttrs[attr.Key]; ok {
+		for _, ap := range apl {
+			if ap.Match(attr.Val) {
+				t.Append(attr)
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func linkable(t *token) bool {
@@ -693,7 +717,7 @@ func (p *Policy) addRelTargetBlank(t *token, href *url.URL) {
 		//
 		// To mitigate this risk, we need to add a specific rel attribute if it is
 		// not already present: rel="noopener".
-		noopener = p.setTargetAttr(t,
+		noopener = p.setTargetBlank(t,
 			external && p.addTargetBlankToFullyQualifiedLinks)
 	}
 
@@ -720,7 +744,7 @@ func externalLink(href *url.URL, t *token) (bool, bool) {
 	return href.IsAbs() || href.Hostname() != "", true
 }
 
-func (p *Policy) setTargetAttr(t *token, required bool) bool {
+func (p *Policy) setTargetBlank(t *token, required bool) bool {
 	const target, blank = "target", "_blank"
 	attr := t.Ref(target)
 
@@ -788,8 +812,7 @@ func (p *Policy) skipToken(t *token) bool {
 }
 
 func (p *Policy) allowNoAttrs(elementName string) bool {
-	_, ok := p.setOfElementsAllowedWithoutAttrs[elementName]
-	if ok {
+	if _, ok := p.setOfElementsAllowedWithoutAttrs[elementName]; ok {
 		return true
 	}
 

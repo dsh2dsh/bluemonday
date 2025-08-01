@@ -60,6 +60,17 @@ This project is a fork of bluemonday. Changes from
   `UGCPolicy()` allows `srcset` on `img` elements. `source` still isn't allowed
   by default.
 
+* `SetAttr` policy, which sets attributes on elements
+
+  `SetAttr` says that HTML attribute with name and value must be added to
+  attributes when `OnElements(...)` is called. Example:
+
+  ```go
+  p.SetAttr("loading", "lazy").OnElements("img")
+  ```
+
+  Now every `img` element will be like `<img src="" loading="lazy"/>`.
+
 bluemonday is a HTML sanitizer implemented in Go. It is fast and highly configurable.
 
 bluemonday takes untrusted user generated content as an input, and will return HTML that has been sanitised against an allowlist of approved HTML elements and attributes so that you can safely include the content in your web page.

@@ -12,11 +12,14 @@ type token struct {
 	index map[string]int
 }
 
-func (self *token) Append(attr html.Attribute) *html.Attribute {
+func (self *token) Append(attrs ...html.Attribute) *html.Attribute {
 	i := len(self.Attr)
-	self.index[attr.Key] = i
-	self.Attr = append(self.Attr, attr)
-	return &self.Attr[i]
+	for _, attr := range attrs {
+		self.index[attr.Key] = i
+		i++
+	}
+	self.Attr = append(self.Attr, attrs...)
+	return &self.Attr[len(self.Attr)-1]
 }
 
 func (self *token) Contains(key string) bool {
@@ -62,4 +65,31 @@ func (self *token) Set(key, val string) {
 		return
 	}
 	self.Append(html.Attribute{Key: key, Val: val})
+}
+
+func (self *token) SetAttrs(attrs []html.Attribute) {
+	var n int
+	for _, attr := range attrs {
+		if i, ok := self.index[attr.Key]; ok {
+			self.Attr[i].Val = attr.Val
+		} else {
+			n++
+		}
+	}
+
+	if n == 0 {
+		return
+	}
+
+	self.Attr = slices.Grow(self.Attr, n)
+	if n == len(attrs) {
+		self.Append(attrs...)
+		return
+	}
+
+	for _, attr := range attrs {
+		if _, ok := self.index[attr.Key]; !ok {
+			self.Append(attr)
+		}
+	}
 }
