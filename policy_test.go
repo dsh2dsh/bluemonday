@@ -32,6 +32,8 @@ package bluemonday
 import (
 	"regexp"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestAllowElementsContent(t *testing.T) {
@@ -296,4 +298,31 @@ func TestStyleOnElementMatching(t *testing.T) {
 			)
 		}
 	}
+}
+
+func TestDeleteFromGlobally(t *testing.T) {
+	p := UGCPolicy()
+	const input = `<div id="foobar"></div>`
+	assert.Equal(t, input, p.Sanitize(input))
+
+	p.AllowAttrs("id").DeleteFromGlobally()
+	assert.Equal(t, `<div></div>`, p.Sanitize(input))
+}
+
+func TestDeleteFromElements(t *testing.T) {
+	p := UGCPolicy()
+	input := `<details open=""></details>`
+	assert.Equal(t, input, p.Sanitize(input))
+
+	p.AllowAttrs("open").DeleteFromElements("details")
+	assert.Equal(t, `<details></details>`, p.Sanitize(input))
+
+	input = `<tag>test</tag>`
+	assert.Equal(t, `test`, p.Sanitize(input))
+
+	p.AllowNoAttrs().OnElements("tag")
+	assert.Equal(t, input, p.Sanitize(input))
+
+	p.AllowNoAttrs().DeleteFromElements("tag")
+	assert.Equal(t, `test`, p.Sanitize(input))
 }

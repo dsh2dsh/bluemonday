@@ -491,6 +491,23 @@ func (abp *AttrPolicyBuilder) attrPolicy() attrPolicy {
 	return ap
 }
 
+// DeleteFromElements will unbind an attribute policy, previously binded to a
+// given range of HTML elements by OnElements, and return the updated policy.
+func (abp *AttrPolicyBuilder) DeleteFromElements(elements ...string) *Policy {
+	for _, element := range elements {
+		element = strings.ToLower(element)
+		if _, ok := abp.p.elsAndAttrs[element]; ok {
+			for _, attr := range abp.attrNames {
+				delete(abp.p.elsAndAttrs[element], attr)
+			}
+		}
+		if abp.allowEmpty {
+			delete(abp.p.setOfElementsAllowedWithoutAttrs, element)
+		}
+	}
+	return abp.p
+}
+
 // OnElementsMatching will bind an attribute policy to all elements matching a given regex
 // and return the updated policy
 func (abp *AttrPolicyBuilder) OnElementsMatching(regex *regexp.Regexp) *Policy {
@@ -503,12 +520,12 @@ func (abp *AttrPolicyBuilder) OnElementsMatching(regex *regexp.Regexp) *Policy {
 	}
 
 	if abp.allowEmpty {
-		abp.p.setOfElementsMatchingAllowedWithoutAttrs = append(abp.p.setOfElementsMatchingAllowedWithoutAttrs, regex)
+		abp.p.setOfElementsMatchingAllowedWithoutAttrs = append(
+			abp.p.setOfElementsMatchingAllowedWithoutAttrs, regex)
 		if _, ok := abp.p.elsMatchingAndAttrs[regex]; !ok {
 			abp.p.elsMatchingAndAttrs[regex] = make(map[string][]attrPolicy)
 		}
 	}
-
 	return abp.p
 }
 
@@ -521,7 +538,15 @@ func (abp *AttrPolicyBuilder) Globally() *Policy {
 		}
 		abp.p.globalAttrs[attr] = append(abp.p.globalAttrs[attr], abp.attrPolicy())
 	}
+	return abp.p
+}
 
+// DeleteFromGlobally will unbind an attribute policy, previously binded by
+// Globally, and return the updated policy.
+func (abp *AttrPolicyBuilder) DeleteFromGlobally() *Policy {
+	for _, attr := range abp.attrNames {
+		delete(abp.p.globalAttrs, attr)
+	}
 	return abp.p
 }
 

@@ -72,6 +72,24 @@ This project is a fork of bluemonday. Changes from
 
   Now every `img` element will be like `<img src="" loading="lazy"/>`.
 
+* `DeleteFromElements` and `DeleteFromGlobally`
+
+  `DeleteFromElements` will unbind an attribute policy, previously binded to a
+  given range of HTML elements by `OnElements`, and return the updated policy.
+
+  `DeleteFromGlobally` will unbind an attribute policy, previously binded by
+  `Globally`, and return the updated policy. Example:
+
+  `UGCPolicy` allows `id` attribute by default, but if somebody doesn't want it,
+  here is how to disable that policy:
+
+  ```go
+  p := UGCPolicy()
+  p.AllowAttrs("id").DeleteFromGlobally()
+  ```
+
+---
+
 bluemonday is a HTML sanitizer implemented in Go. It is fast and highly configurable.
 
 bluemonday takes untrusted user generated content as an input, and will return HTML that has been sanitised against an allowlist of approved HTML elements and attributes so that you can safely include the content in your web page.
