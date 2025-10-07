@@ -5,7 +5,7 @@ go 1.24
 require (
 	github.com/aymerick/douceur v0.2.0
 	github.com/stretchr/testify v1.11.1
-	golang.org/x/net v0.43.0
+	golang.org/x/net v0.44.0
 )
 
 require (
