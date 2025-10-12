@@ -104,15 +104,6 @@ type Policy struct {
 	// map[htmlAttributeName][]attrPolicy
 	globalAttrs map[string][]attrPolicy
 
-	// map[htmlElementName]map[cssPropertyName][]stylePolicy
-	elsAndStyles map[string]map[string][]stylePolicy
-
-	// map[regex]map[cssPropertyName][]stylePolicy
-	elsMatchingAndStyles map[*regexp.Regexp]map[string][]stylePolicy
-
-	// map[cssPropertyName][]stylePolicy
-	globalStyles map[string][]stylePolicy
-
 	// If urlPolicy is nil, all URLs with matching schema are allowed.
 	// Otherwise, only the URLs with matching schema and urlPolicy(url)
 	// returning true are allowed.
@@ -176,7 +167,8 @@ type Policy struct {
 	// parsable by "net/url" url.Parse().
 	urlRewriter func(*html.Token, *url.URL) *url.URL
 
-	setAttrs map[string][]html.Attribute
+	setAttrs    map[string][]html.Attribute
+	stylePolicy *css.Policy
 }
 
 type attrPolicy struct {
@@ -214,20 +206,6 @@ func (self *attrPolicy) Match(value string) bool {
 	return matched
 }
 
-type stylePolicy struct {
-	// handler to validate
-	handler func(string) bool
-
-	// optional pattern to match, when not nil the regexp needs to match
-	// otherwise the property is removed
-	regexp *regexp.Regexp
-
-	// optional list of allowed property values, for properties which
-	// have a defined list of allowed values; property will be removed
-	// if the value is not allowed
-	enum []string
-}
-
 type AttrPolicyBuilder struct {
 	p *Policy
 
@@ -238,12 +216,8 @@ type AttrPolicyBuilder struct {
 }
 
 type StylePolicyBuilder struct {
-	p *Policy
-
-	propertyNames []string
-	regexp        *regexp.Regexp
-	enum          []string
-	handler       func(string) bool
+	p             *Policy
+	policyBuilder *css.PolicyBuilder
 }
 
 type Attribute struct {
@@ -281,9 +255,6 @@ func (p *Policy) init() {
 	p.elsAndAttrs = make(map[string]map[string][]attrPolicy)
 	p.elsMatchingAndAttrs = make(map[*regexp.Regexp]map[string][]attrPolicy)
 	p.globalAttrs = make(map[string][]attrPolicy)
-	p.elsAndStyles = make(map[string]map[string][]stylePolicy)
-	p.elsMatchingAndStyles = make(map[*regexp.Regexp]map[string][]stylePolicy)
-	p.globalStyles = make(map[string][]stylePolicy)
 	p.allowURLSchemes = make(map[string][]urlPolicy)
 	p.allowURLSchemeRegexps = make([]*regexp.Regexp, 0)
 	p.setOfElementsAllowedWithoutAttrs = make(map[string]struct{})
@@ -556,120 +527,59 @@ func (abp *AttrPolicyBuilder) DeleteFromGlobally() *Policy {
 //
 // The style policy is only added to the core policy when either Globally()
 // or OnElements(...) are called.
-func (p *Policy) AllowStyles(propertyNames ...string) *StylePolicyBuilder {
+func (p *Policy) AllowStyles(propertyNames ...string) StylePolicyBuilder {
 	p.init()
-
-	abp := StylePolicyBuilder{
-		p: p,
+	if p.stylePolicy == nil {
+		p.stylePolicy = css.NewPolicy()
 	}
 
-	for _, propertyName := range propertyNames {
-		abp.propertyNames = append(abp.propertyNames, strings.ToLower(propertyName))
+	return StylePolicyBuilder{
+		p:             p,
+		policyBuilder: p.stylePolicy.AllowStyles(propertyNames...),
 	}
-
-	return &abp
 }
 
 // Matching allows a regular expression to be applied to a nascent style
 // policy, and returns the style policy.
-func (spb *StylePolicyBuilder) Matching(regex *regexp.Regexp) *StylePolicyBuilder {
-	spb.regexp = regex
-
+func (spb StylePolicyBuilder) Matching(regex *regexp.Regexp,
+) StylePolicyBuilder {
+	spb.policyBuilder.Matching(regex)
 	return spb
 }
 
 // MatchingEnum allows a list of allowed values to be applied to a nascent style
 // policy, and returns the style policy.
-func (spb *StylePolicyBuilder) MatchingEnum(enum ...string) *StylePolicyBuilder {
-	spb.enum = enum
-
+func (spb StylePolicyBuilder) MatchingEnum(enum ...string) StylePolicyBuilder {
+	spb.policyBuilder.MatchingEnum(enum...)
 	return spb
 }
 
 // MatchingHandler allows a handler to be applied to a nascent style
 // policy, and returns the style policy.
-func (spb *StylePolicyBuilder) MatchingHandler(handler func(string) bool) *StylePolicyBuilder {
-	spb.handler = handler
-
+func (spb StylePolicyBuilder) MatchingHandler(handler func(string) bool,
+) StylePolicyBuilder {
+	spb.policyBuilder.MatchingHandler(handler)
 	return spb
 }
 
 // OnElements will bind a style policy to a given range of HTML elements
 // and return the updated policy
-func (spb *StylePolicyBuilder) OnElements(elements ...string) *Policy {
-	for _, element := range elements {
-		element = strings.ToLower(element)
-
-		for _, attr := range spb.propertyNames {
-			if _, ok := spb.p.elsAndStyles[element]; !ok {
-				spb.p.elsAndStyles[element] = make(map[string][]stylePolicy)
-			}
-
-			sp := stylePolicy{}
-			switch {
-			case spb.handler != nil:
-				sp.handler = spb.handler
-			case len(spb.enum) > 0:
-				sp.enum = spb.enum
-			case spb.regexp != nil:
-				sp.regexp = spb.regexp
-			default:
-				sp.handler = css.GetDefaultHandler(attr)
-			}
-			spb.p.elsAndStyles[element][attr] = append(
-				spb.p.elsAndStyles[element][attr], sp)
-		}
-	}
+func (spb StylePolicyBuilder) OnElements(elements ...string) *Policy {
+	spb.policyBuilder.OnElements(elements...)
 	return spb.p
 }
 
 // OnElementsMatching will bind a style policy to any HTML elements matching the pattern
 // and return the updated policy
-func (spb *StylePolicyBuilder) OnElementsMatching(regex *regexp.Regexp) *Policy {
-	for _, attr := range spb.propertyNames {
-		if _, ok := spb.p.elsMatchingAndStyles[regex]; !ok {
-			spb.p.elsMatchingAndStyles[regex] = make(map[string][]stylePolicy)
-		}
-
-		sp := stylePolicy{}
-		switch {
-		case spb.handler != nil:
-			sp.handler = spb.handler
-		case len(spb.enum) > 0:
-			sp.enum = spb.enum
-		case spb.regexp != nil:
-			sp.regexp = spb.regexp
-		default:
-			sp.handler = css.GetDefaultHandler(attr)
-		}
-		spb.p.elsMatchingAndStyles[regex][attr] = append(
-			spb.p.elsMatchingAndStyles[regex][attr], sp)
-	}
+func (spb StylePolicyBuilder) OnElementsMatching(regex *regexp.Regexp) *Policy {
+	spb.policyBuilder.OnElementsMatching(regex)
 	return spb.p
 }
 
 // Globally will bind a style policy to all HTML elements and return the
 // updated policy
-func (spb *StylePolicyBuilder) Globally() *Policy {
-	for _, attr := range spb.propertyNames {
-		if _, ok := spb.p.globalStyles[attr]; !ok {
-			spb.p.globalStyles[attr] = []stylePolicy{}
-		}
-
-		// Use only one strategy for validating styles, fallback to default
-		sp := stylePolicy{}
-		switch {
-		case spb.handler != nil:
-			sp.handler = spb.handler
-		case len(spb.enum) > 0:
-			sp.enum = spb.enum
-		case spb.regexp != nil:
-			sp.regexp = spb.regexp
-		default:
-			sp.handler = css.GetDefaultHandler(attr)
-		}
-		spb.p.globalStyles[attr] = append(spb.p.globalStyles[attr], sp)
-	}
+func (spb StylePolicyBuilder) Globally() *Policy {
+	spb.policyBuilder.Globally()
 	return spb.p
 }
 

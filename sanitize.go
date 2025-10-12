@@ -457,14 +457,14 @@ func dataAttribute(val string) bool {
 
 func (p *Policy) matchStylePolicy(t *token, attr html.Attribute) bool {
 	// Is this a "style" attribute, and if so, do we need to sanitize it?
-	if attr.Key != "style" || !p.hasStylePolicies(t.Data) {
+	if p.stylePolicy == nil || attr.Key != "style" {
 		return false
 	}
 
-	p.sanitizeStyles(&attr, t.Data)
-	if attr.Val != "" {
+	if attr.Val = p.stylePolicy.Sanitize(t.Data, attr.Val); attr.Val != "" {
 		t.Append(attr)
 	}
+
 	// We've sanitized away any and all styles; don't bother to
 	// output the style attribute (even if it's allowed)
 	return true
