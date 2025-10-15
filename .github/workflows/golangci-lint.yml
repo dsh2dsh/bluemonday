@@ -1,26 +1,26 @@
-name: golangci-lint
+name: "golangci-lint"
 on:
   push:
     branches: [ "master" ]
   pull_request:
 
 permissions:
-  contents: read
+  contents: "read"
   # Optional: allow read access to pull request. Use with `only-new-issues`
   # option.
   # pull-requests: read
 
 jobs:
-  golangci:
-    name: lint
-    runs-on: ubuntu-latest
+  "golangci":
+    name: "lint"
+    runs-on: "ubuntu-latest"
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: "actions/checkout@v4"
+      - uses: "actions/setup-go@v6"
         with:
           go-version-file: 'go.mod'
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@v8
+      - name: "golangci-lint"
+        uses: "golangci/golangci-lint-action@v8"
         with:
           # Require: The version of golangci-lint to use.
           #
