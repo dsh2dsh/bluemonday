@@ -326,3 +326,15 @@ func TestDeleteFromElements(t *testing.T) {
 	p.AllowNoAttrs().DeleteFromElements("tag")
 	assert.Equal(t, `test`, p.Sanitize(input))
 }
+
+func TestWithStyleHandler(t *testing.T) {
+	p := UGCPolicy().WithStyleHandler(func(tag, style string) string {
+		if tag == "p" {
+			return style
+		}
+		return ""
+	})
+	assert.Equal(t,
+		`<div><p style="color: red;"></p></div>`,
+		p.Sanitize(`<div style="color: blue;"><p style="color: red;"></p></div>`))
+}

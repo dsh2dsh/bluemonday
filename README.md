@@ -88,6 +88,24 @@ This project is a fork of bluemonday. Changes from
   p.AllowAttrs("id").DeleteFromGlobally()
   ```
 
+* Custom sanitizer for inline styles.
+
+  `WithStyleHandler` sets a custom sanitizer for inline styles and returns
+  updated policy.
+
+  The custom sanitizer returns sanitized content of given style attribute for
+  given tag. Returned empty string means style attribute is not allowed on this
+  tag. Example:
+
+  ```go
+  p := UGCPolicy().WithStyleHandler(func(tag, style string) string {
+    if tag == "p" {
+      return style
+    }
+    return ""
+  })
+  ```
+
 ---
 
 bluemonday is a HTML sanitizer implemented in Go. It is fast and highly configurable.

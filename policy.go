@@ -167,8 +167,9 @@ type Policy struct {
 	// parsable by "net/url" url.Parse().
 	urlRewriter func(*html.Token, *url.URL) *url.URL
 
-	setAttrs    map[string][]html.Attribute
-	stylePolicy *css.Policy
+	setAttrs     map[string][]html.Attribute
+	stylePolicy  *css.Policy
+	styleHandler func(tag, style string) string
 }
 
 type attrPolicy struct {
@@ -519,6 +520,17 @@ func (abp *AttrPolicyBuilder) DeleteFromGlobally() *Policy {
 		delete(abp.p.globalAttrs, attr)
 	}
 	return abp.p
+}
+
+// WithStyleHandler sets h as a custom sanitizer for inline styles and returns
+// updated policy.
+//
+// The custom sanitizer returns sanitized content of given style attribute for
+// given tag. Returned empty string means style attribute is not allowed on this
+// tag.
+func (p *Policy) WithStyleHandler(h func(tag, style string) string) *Policy {
+	p.styleHandler = h
+	return p
 }
 
 // AllowStyles takes a range of CSS property names and returns a
