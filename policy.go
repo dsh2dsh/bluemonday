@@ -37,8 +37,6 @@ import (
 	"strings"
 
 	"golang.org/x/net/html"
-
-	"github.com/dsh2dsh/bluemonday/css"
 )
 
 // Policy encapsulates the allowlist of HTML elements and attributes that will
@@ -168,7 +166,6 @@ type Policy struct {
 	urlRewriter func(*html.Token, *url.URL) *url.URL
 
 	setAttrs     map[string][]html.Attribute
-	stylePolicy  *css.Policy
 	styleHandler func(tag, style string) string
 }
 
@@ -214,11 +211,6 @@ type AttrPolicyBuilder struct {
 	regexp     *regexp.Regexp
 	values     []string
 	allowEmpty bool
-}
-
-type StylePolicyBuilder struct {
-	p             *Policy
-	policyBuilder *css.PolicyBuilder
 }
 
 type Attribute struct {
@@ -531,68 +523,6 @@ func (abp *AttrPolicyBuilder) DeleteFromGlobally() *Policy {
 func (p *Policy) WithStyleHandler(h func(tag, style string) string) *Policy {
 	p.styleHandler = h
 	return p
-}
-
-// AllowStyles takes a range of CSS property names and returns a
-// style policy builder that allows you to specify the pattern and scope of
-// the allowed property.
-//
-// The style policy is only added to the core policy when either Globally()
-// or OnElements(...) are called.
-func (p *Policy) AllowStyles(propertyNames ...string) StylePolicyBuilder {
-	p.init()
-	if p.stylePolicy == nil {
-		p.stylePolicy = css.NewPolicy()
-	}
-
-	return StylePolicyBuilder{
-		p:             p,
-		policyBuilder: p.stylePolicy.AllowStyles(propertyNames...),
-	}
-}
-
-// Matching allows a regular expression to be applied to a nascent style
-// policy, and returns the style policy.
-func (spb StylePolicyBuilder) Matching(regex *regexp.Regexp,
-) StylePolicyBuilder {
-	spb.policyBuilder.Matching(regex)
-	return spb
-}
-
-// MatchingEnum allows a list of allowed values to be applied to a nascent style
-// policy, and returns the style policy.
-func (spb StylePolicyBuilder) MatchingEnum(enum ...string) StylePolicyBuilder {
-	spb.policyBuilder.MatchingEnum(enum...)
-	return spb
-}
-
-// MatchingHandler allows a handler to be applied to a nascent style
-// policy, and returns the style policy.
-func (spb StylePolicyBuilder) MatchingHandler(handler func(string) bool,
-) StylePolicyBuilder {
-	spb.policyBuilder.MatchingHandler(handler)
-	return spb
-}
-
-// OnElements will bind a style policy to a given range of HTML elements
-// and return the updated policy
-func (spb StylePolicyBuilder) OnElements(elements ...string) *Policy {
-	spb.policyBuilder.OnElements(elements...)
-	return spb.p
-}
-
-// OnElementsMatching will bind a style policy to any HTML elements matching the pattern
-// and return the updated policy
-func (spb StylePolicyBuilder) OnElementsMatching(regex *regexp.Regexp) *Policy {
-	spb.policyBuilder.OnElementsMatching(regex)
-	return spb.p
-}
-
-// Globally will bind a style policy to all HTML elements and return the
-// updated policy
-func (spb StylePolicyBuilder) Globally() *Policy {
-	spb.policyBuilder.Globally()
-	return spb.p
 }
 
 // AllowElements will append HTML elements to the allowlist without applying an

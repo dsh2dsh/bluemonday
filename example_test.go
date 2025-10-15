@@ -34,7 +34,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/dsh2dsh/bluemonday"
+	"github.com/dsh2dsh/bluemonday/v2"
 )
 
 func Example() {
@@ -189,45 +189,6 @@ func ExamplePolicy_AllowAttrs() {
 	p.AllowAttrs("colspan", "rowspan").Matching(
 		bluemonday.Integer,
 	).OnElements("td", "th")
-}
-
-func ExamplePolicy_AllowStyles() {
-	p := bluemonday.NewPolicy()
-
-	// Allow only 'span' and 'p' elements
-	p.AllowElements("span", "p", "strong")
-
-	// Only allow 'style' attributes on 'span' and 'p' elements
-	p.AllowAttrs("style").OnElements("span", "p")
-
-	// Allow the 'text-decoration' property to be set to 'underline', 'line-through' or 'none'
-	// on 'span' elements only
-	p.AllowStyles("text-decoration").MatchingEnum("underline", "line-through", "none").OnElements("span")
-
-	// Allow the 'color' property with valid RGB(A) hex values only
-	// on every HTML element that has been allowed
-	p.AllowStyles("color").Matching(regexp.MustCompile("(?i)^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$")).Globally()
-
-	// Default handler
-	p.AllowStyles("background-origin").Globally()
-
-	// The span has an invalid 'color' which will be stripped along with other disallowed properties
-	html := p.Sanitize(
-		`<p style="color:#f00;">
-	<span style="text-decoration: underline; background-image: url(javascript:alert('XSS')); color: #f00ba; background-origin: invalidValue">
-		Red underlined <strong style="text-decoration:none;">text</strong>
-	</span>
-</p>`,
-	)
-
-	fmt.Println(html)
-
-	// Output:
-	// <p style="color: #f00">
-	//	<span style="text-decoration: underline">
-	//		Red underlined <strong>text</strong>
-	//	</span>
-	// </p>
 }
 
 func ExamplePolicy_AllowElements() {

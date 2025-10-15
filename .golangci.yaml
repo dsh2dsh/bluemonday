@@ -15,7 +15,7 @@ formatters:
       # with the given prefixes are grouped after 3rd-party packages.
       # Default: []
       local-prefixes:
-        - "github.com/dsh2dsh/bluemonday"
+        - "github.com/dsh2dsh/bluemonday/v2"
 
 linters:
   enable:
@@ -124,7 +124,7 @@ linters:
       # useful for broadly ignoring packages and/or subpackages from wrapcheck
       # analysis. There are no defaults for this value.
       ignore-package-globs:
-       - "github.com/dsh2dsh/bluemonday/*"
+       - "github.com/dsh2dsh/bluemonday/v2/*"
 
   exclusions:
     rules:

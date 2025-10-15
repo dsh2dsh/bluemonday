@@ -462,8 +462,6 @@ func (p *Policy) matchStylePolicy(t *token, attr html.Attribute) bool {
 		return false
 	case p.styleHandler != nil:
 		attr.Val = p.styleHandler(t.Data, attr.Val)
-	case p.stylePolicy != nil:
-		attr.Val = p.stylePolicy.Sanitize(t.Data, attr.Val)
 	default:
 		return false
 	}

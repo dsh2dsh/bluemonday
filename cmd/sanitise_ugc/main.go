@@ -6,7 +6,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/dsh2dsh/bluemonday"
+	"github.com/dsh2dsh/bluemonday/v2"
 )
 
 func main() {

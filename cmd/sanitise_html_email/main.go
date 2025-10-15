@@ -7,7 +7,7 @@ import (
 	"os"
 	"regexp"
 
-	"github.com/dsh2dsh/bluemonday"
+	"github.com/dsh2dsh/bluemonday/v2"
 )
 
 var (

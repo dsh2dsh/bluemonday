@@ -1,7 +1,7 @@
 # bluemonday
 
 [![Go](https://github.com/dsh2dsh/bluemonday/actions/workflows/go.yml/badge.svg)](https://github.com/dsh2dsh/bluemonday/actions/workflows/go.yml)
-[![GoDoc](https://godoc.org/github.com/dsh2dsh/bluemonday?status.png)](https://godoc.org/github.com/dsh2dsh/bluemonday)
+[![GoDoc](https://godoc.org/github.com/dsh2dsh/bluemonday/v2?status.png)](https://godoc.org/github.com/dsh2dsh/bluemonday/v2)
 
 This project is a fork of bluemonday. Changes from
 [upstream](https://github.com/microcosm-cc/bluemonday):
@@ -106,6 +106,12 @@ This project is a fork of bluemonday. Changes from
   })
   ```
 
+* CSS sanitizer moved into standalone [bluemonday-css]
+
+  See [Inline CSS](#inline-css) for details.
+
+  [bluemonday-css]: https://github.com/dsh2dsh/bluemonday-css
+
 ---
 
 bluemonday is a HTML sanitizer implemented in Go. It is fast and highly configurable.
@@ -176,7 +182,7 @@ We invite pull requests and issues to help us ensure we are offering comprehensi
 
 ## Usage
 
-Install using `go get github.com/microcosm-cc/bluemonday`
+Install using `go get github.com/dsh2dsh/bluemonday/v2`
 
 Then call it:
 ```go
@@ -185,7 +191,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/microcosm-cc/bluemonday"
+	"github.com/dsh2dsh/bluemonday/v2"
 )
 
 func main() {
@@ -220,7 +226,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/microcosm-cc/bluemonday"
+	"github.com/dsh2dsh/bluemonday/v2"
 )
 
 func main() {
@@ -320,46 +326,71 @@ p.AllowElements("fieldset", "select", "option")
 
 ### Inline CSS
 
-Although it's possible to handle inline CSS using `AllowAttrs` with a `Matching` rule, writing a single monolithic regular expression to safely process all inline CSS which you wish to allow is not a trivial task.  Instead of attempting to do so, you can allow the `style` attribute on whichever element(s) you desire and use style policies to control and sanitize inline styles.
+Although it's possible to handle inline CSS using `AllowAttrs` with a `Matching`
+rule, writing a single monolithic regular expression to safely process all
+inline CSS which you wish to allow is not a trivial task. Instead of attempting
+to do so, you can allow the `style` attribute on whichever element(s) you desire
+and use style policies from [bluemonday-css] to control and sanitize inline
+styles.
+
+[bluemonday-css]: https://github.com/dsh2dsh/bluemonday-css
+
+``` go
+import (
+  css "github.com/dsh2dsh/bluemonday-css"
+)
+
+stylesPolicy := css.NewPolicy()
+p := bluemonday.UGCPolicy().WithStyleHandler(stylesPolicy.Sanitize)
+```
 
 It is strongly recommended that you use `Matching` (with a suitable regular expression)
 `MatchingEnum`, or `MatchingHandler` to ensure each style matches your needs,
 but default handlers are supplied for most widely used styles.
 
 Similar to attributes, you can allow specific CSS properties to be set inline:
-```go
+``` go
 p.AllowAttrs("style").OnElements("span", "p")
-// Allow the 'color' property with valid RGB(A) hex values only (on any element allowed a 'style' attribute)
-p.AllowStyles("color").Matching(regexp.MustCompile("(?i)^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$")).Globally()
+// Allow the 'color' property with valid RGB(A) hex values only (on any element
+// allowed a 'style' attribute)
+stylesPolicy.AllowStyles("color").
+  Matching(
+    regexp.MustCompile("(?i)^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$")).
+  Globally()
 ```
 
 Additionally, you can allow a CSS property to be set only to an allowed value:
-```go
+``` go
 p.AllowAttrs("style").OnElements("span", "p")
-// Allow the 'text-decoration' property to be set to 'underline', 'line-through' or 'none'
-// on 'span' elements only
-p.AllowStyles("text-decoration").MatchingEnum("underline", "line-through", "none").OnElements("span")
+// Allow the 'text-decoration' property to be set to 'underline', 'line-through'
+// or 'none' on 'span' elements only
+stylesPolicy.AllowStyles("text-decoration").
+  MatchingEnum("underline", "line-through", "none").
+  OnElements("span")
 ```
 
 Or you can specify elements based on a regex pattern match:
 ```go
 p.AllowAttrs("style").OnElementsMatching(regex.MustCompile(`^my-element-`))
-// Allow the 'text-decoration' property to be set to 'underline', 'line-through' or 'none'
-// on 'span' elements only
-p.AllowStyles("text-decoration").MatchingEnum("underline", "line-through", "none").OnElementsMatching(regex.MustCompile(`^my-element-`))
+// Allow the 'text-decoration' property to be set to 'underline', 'line-through'
+// or 'none' on 'span' elements only
+stylesPolicy.AllowStyles("text-decoration").
+  MatchingEnum("underline", "line-through", "none").
+  OnElementsMatching(regex.MustCompile(`^my-element-`))
 ```
 
 If you need more specific checking, you can create a handler that takes in a string and returns a bool to
 validate the values for a given property. The string parameter has been
 converted to lowercase and unicode code points have been converted.
-```go
+``` go
 myHandler := func(value string) bool{
-	// Validate your input here
-	return true
+  // Validate your input here
+  return true
 }
 p.AllowAttrs("style").OnElements("span", "p")
-// Allow the 'color' property with values validated by the handler (on any element allowed a 'style' attribute)
-p.AllowStyles("color").MatchingHandler(myHandler).Globally()
+// Allow the 'color' property with values validated by the handler (on any
+// element allowed a 'style' attribute)
+stylesPolicy.AllowStyles("color").MatchingHandler(myHandler).Globally()
 ```
 
 ### Callback Function for element's attributes
