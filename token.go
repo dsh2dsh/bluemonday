@@ -1,6 +1,7 @@
 package bluemonday
 
 import (
+	"net/url"
 	"slices"
 
 	"golang.org/x/net/html"
@@ -10,6 +11,7 @@ type token struct {
 	html.Token
 
 	index map[string]int
+	u     *url.URL
 }
 
 func (self *token) Append(attrs ...html.Attribute) *html.Attribute {
@@ -56,15 +58,20 @@ func (self *token) Reset() []html.Attribute {
 	attrs := self.Attr
 	self.Attr = self.Attr[:0]
 	clear(self.index)
+	self.u = nil
 	return attrs
 }
 
 func (self *token) Set(key, val string) {
-	if i, ok := self.index[key]; ok {
-		self.Attr[i].Val = val
+	self.SetAttr(html.Attribute{Key: key, Val: val})
+}
+
+func (self *token) SetAttr(attr html.Attribute) {
+	if i, ok := self.index[attr.Key]; ok {
+		self.Attr[i] = attr
 		return
 	}
-	self.Append(html.Attribute{Key: key, Val: val})
+	self.Append(attr)
 }
 
 func (self *token) SetAttrs(attrs []html.Attribute) {
@@ -93,3 +100,6 @@ func (self *token) SetAttrs(attrs []html.Attribute) {
 		}
 	}
 }
+
+func (self *token) SetURL(u *url.URL) { self.u = u }
+func (self *token) URL() *url.URL     { return self.u }

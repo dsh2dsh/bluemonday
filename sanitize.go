@@ -418,6 +418,8 @@ func (p *Policy) sanitizeAttrs(t *token, aps map[string][]attrPolicy) {
 			p.sandboxIframe(t)
 		}
 	}
+
+	p.setCondAttrs(t)
 }
 
 func (p *Policy) modifyTokenAttr(t *token) []html.Attribute {
@@ -590,6 +592,7 @@ func (p *Policy) deleteInvalidURL(t *token, name string,
 		}
 	}
 
+	t.SetURL(u)
 	attr.Val = u.String()
 	return u
 }
@@ -644,6 +647,10 @@ func (p *Policy) validURL(t *token, rawurl string) *url.URL {
 }
 
 func (p *Policy) rewriteURL(t *token, u *url.URL) *url.URL {
+	if u == nil {
+		return nil
+	}
+
 	if p.urlRewriter != nil {
 		return p.urlRewriter(&t.Token, u)
 	}
@@ -656,6 +663,10 @@ func (p *Policy) rewriteURL(t *token, u *url.URL) *url.URL {
 }
 
 func (p *Policy) rewriteSrc(u *url.URL) *url.URL {
+	if u == nil {
+		return nil
+	}
+
 	if p.srcRewriter != nil {
 		p.srcRewriter(u)
 	}
@@ -687,11 +698,11 @@ func (p *Policy) sanitizeSrcSet(t *token) bool {
 func (self *Policy) parseSrcSetAttribute(t *token, attr string,
 ) ImageCandidates {
 	urlParser := func(s string) *url.URL {
-		u := self.validURL(t, s)
-		if u == nil {
+		if u := self.rewriteSrc(self.validURL(t, s)); u != nil {
+			t.SetURL(u)
 			return u
 		}
-		return self.rewriteSrc(u)
+		return nil
 	}
 	return parseSrcSetAttribute(attr, urlParser)
 }
@@ -854,4 +865,17 @@ func (p *Policy) sandboxIframe(t *token) {
 			return !ok
 		})
 	attr.Val = strings.Join(values, " ")
+}
+
+func (p *Policy) setCondAttrs(t *token) {
+	attrs, ok := p.setAttrsIf[t.Data]
+	if !ok {
+		return
+	}
+
+	for _, attr := range attrs {
+		if attr.Match(t) {
+			t.SetAttr(attr.attr)
+		}
+	}
 }

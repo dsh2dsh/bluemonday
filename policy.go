@@ -165,7 +165,9 @@ type Policy struct {
 	// parsable by "net/url" url.Parse().
 	urlRewriter func(*html.Token, *url.URL) *url.URL
 
-	setAttrs     map[string][]html.Attribute
+	setAttrs   map[string][]html.Attribute
+	setAttrsIf map[string][]setAttrPolicy
+
 	styleHandler func(tag, style string) string
 }
 
@@ -213,11 +215,6 @@ type AttrPolicyBuilder struct {
 	allowEmpty bool
 }
 
-type Attribute struct {
-	p    *Policy
-	attr html.Attribute
-}
-
 type urlPolicy func(url *url.URL) (allowUrl bool)
 
 type SandboxValue int
@@ -253,6 +250,7 @@ func (p *Policy) init() {
 	p.setOfElementsAllowedWithoutAttrs = make(map[string]struct{})
 	p.setOfElementsToSkipContent = make(map[string]struct{})
 	p.setAttrs = make(map[string][]html.Attribute)
+	p.setAttrsIf = make(map[string][]setAttrPolicy)
 	p.initialized = true
 }
 
@@ -376,30 +374,6 @@ func (p *Policy) AllowNoAttrs() *AttrPolicyBuilder {
 func (abp *AttrPolicyBuilder) AllowNoAttrs() *AttrPolicyBuilder {
 	abp.allowEmpty = true
 	return abp
-}
-
-// SetAttr says that HTML attribute with name and value must be added to
-// attributes when OnElements(...) is called.
-func (p *Policy) SetAttr(name, value string) Attribute {
-	p.init()
-	return Attribute{
-		p:    p,
-		attr: html.Attribute{Key: strings.ToLower(name), Val: value},
-	}
-}
-
-// OnElements will set attribute on a given range of HTML elements and return
-// the updated policy
-func (self Attribute) OnElements(elements ...string) *Policy {
-	if self.attr.Key == "" {
-		return self.p
-	}
-
-	for _, element := range elements {
-		element = strings.ToLower(element)
-		self.p.setAttrs[element] = append(self.p.setAttrs[element], self.attr)
-	}
-	return self.p
 }
 
 // Matching allows a regular expression to be applied to a nascent attribute

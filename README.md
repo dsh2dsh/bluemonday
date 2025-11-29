@@ -112,6 +112,23 @@ This project is a fork of bluemonday. Changes from
 
   [bluemonday-css]: https://github.com/dsh2dsh/bluemonday-css
 
+* `SetAttrIf` policy, which conditionally sets attributes on elements.
+
+  `SetAttrIf` sets that HTML attribute with given name and value must be added
+  to attributes when `OnElements` is called, if given condition evaluates to
+  true. If it evaluates to false, this policy does nothing. Example:
+
+  ```go
+  p.SetAttrIf("referrerpolicy", "strict-origin-when-cross-origin",
+    DomainIn("youtube.com", "youtube-nocookie.com"),
+  ).OnElements("iframe")
+  ```
+
+  That policy adds `referrerpolicy="strict-origin-when-cross-origin"` to
+  `iframe`s with `src` like `https://youtube.com` or `https://www.youtube.com`
+  or `https://youtube-nocookie.com` and so on, where domain name is
+  `youtube.com` or `youtube-nocookie.com`.
+
 ---
 
 bluemonday is a HTML sanitizer implemented in Go. It is fast and highly configurable.
