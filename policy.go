@@ -55,57 +55,57 @@ type Policy struct {
 	addSpaces bool
 
 	// When true, add rel="nofollow" to HTML a, area, and link tags
-	requireNoFollow bool
+	relNoFollow bool
 
 	// When true, add rel="nofollow" to HTML a, area, and link tags
 	// Will add for href="http://foo"
 	// Will skip for href="/foo" or href="foo"
-	requireNoFollowFullyQualifiedLinks bool
+	relNoFollowAbsOnly bool
 
 	// When true, add rel="noreferrer" to HTML a, area, and link tags
-	requireNoReferrer bool
+	relNoReferrer bool
 
 	// When true, add rel="noreferrer" to HTML a, area, and link tags
 	// Will add for href="http://foo"
 	// Will skip for href="/foo" or href="foo"
-	requireNoReferrerFullyQualifiedLinks bool
+	relNoReferrerAbsOnly bool
 
 	// When true, add crossorigin="anonymous" to HTML audio, img, link, script, and video tags
-	requireCrossOriginAnonymous bool
+	crossoriginAnonymous bool
 
 	// When true, add and filter sandbox attribute on iframe tags
-	requireSandboxOnIFrame map[string]struct{}
+	sandboxIframeAttrs map[string]struct{}
 
 	// When true add target="_blank" to fully qualified links
 	// Will add for href="http://foo"
 	// Will skip for href="/foo" or href="foo"
-	addTargetBlankToFullyQualifiedLinks bool
+	targetBlank bool
 
 	// When true, URLs must be parseable by "net/url" url.Parse()
-	requireParseableURLs bool
+	parseableURLs bool
 
 	// When true, u, _ := url.Parse("url"); !u.IsAbs() is permitted
-	allowRelativeURLs bool
+	relativeURLs bool
 
 	// When true, allow data attributes.
-	allowDataAttributes bool
+	dataAttributes bool
 
 	// When true, allow comments.
-	allowComments bool
+	comments bool
 
-	// map[htmlElementName]map[htmlAttributeName][]attrPolicy
-	elsAndAttrs map[string]map[string][]attrPolicy
+	// map[htmlElementName]element
+	elements map[string]*element
 
-	// elsMatchingAndAttrs stores regex based element matches along with attributes
-	elsMatchingAndAttrs map[*regexp.Regexp]map[string][]attrPolicy
+	// matchingElements stores regex based element matches along with attributes
+	matchingElements map[*regexp.Regexp]*element
 
-	// map[htmlAttributeName][]attrPolicy
-	globalAttrs map[string][]attrPolicy
+	// map[htmlAttributeName][]*attrPolicy
+	globalAttrs map[string][]*attrPolicy
 
 	// If urlPolicy is nil, all URLs with matching schema are allowed.
 	// Otherwise, only the URLs with matching schema and urlPolicy(url)
 	// returning true are allowed.
-	allowURLSchemes map[string][]urlPolicy
+	urlSchemes map[string][]urlPolicy
 
 	// These regexps are used to match allowed URL schemes, for example
 	// if one would want to allow all URL schemes, they would add `.+`.
@@ -113,7 +113,7 @@ type Policy struct {
 	// defeating the purpose of using a HTML sanitizer.
 	// The regexps are only considered if a schema was not explicitly
 	// handled by `AllowURLSchemes` or `AllowURLSchemeWithCustomPolicy`.
-	allowURLSchemeRegexps []*regexp.Regexp
+	urlSchemeRegexps []*regexp.Regexp
 
 	// If srcRewriter is not nil, it is used to rewrite the src attribute
 	// of tags that download resources, such as <img> and <script>.
@@ -127,7 +127,7 @@ type Policy struct {
 	// any attributes, i.e. <table>. To prevent those being removed we maintain
 	// a list of elements that are allowed to have no attributes and that will
 	// be maintained in the output HTML.
-	setOfElementsAllowedWithoutAttrs map[string]struct{}
+	withoutAttrs map[string]struct{}
 
 	// If an element has had all attributes removed as a result of a policy
 	// being applied, then the element would be removed from the output.
@@ -137,9 +137,9 @@ type Policy struct {
 	//
 	// In this case, any element matching a regular expression will be accepted without
 	// attributes added.
-	setOfElementsMatchingAllowedWithoutAttrs []*regexp.Regexp
+	matchingWithoutAttrs []*regexp.Regexp
 
-	setOfElementsToSkipContent map[string]struct{}
+	skipContent map[string]struct{}
 
 	// Permits fundamentally unsafe elements.
 	//
@@ -152,7 +152,7 @@ type Policy struct {
 	// policy declares them. However this is not recommended under any circumstance
 	// and can lead to XSS being rendered thus defeating the purpose of using a
 	// HTML sanitizer.
-	allowUnsafe bool
+	unsafe bool
 
 	// callbackAttr is callback function that will be called before element's
 	// attributes are parsed. The callback function can add/remove/modify the
@@ -166,14 +166,14 @@ type Policy struct {
 	urlRewriter func(*html.Token, *url.URL) *url.URL
 
 	setAttrs   map[string][]html.Attribute
-	setAttrsIf map[string][]setAttrPolicy
+	setAttrsIf map[string][]*setAttrPolicy
 
 	styleHandler func(tag, style string) string
 }
 
 type attrPolicy struct {
-	singleValue string
-	values      map[string]struct{}
+	single string
+	values map[string]struct{}
 
 	// optional pattern to match, when not nil the regexp needs to match
 	// otherwise the attribute is removed
@@ -182,28 +182,25 @@ type attrPolicy struct {
 
 func (self *attrPolicy) Match(value string) bool {
 	matched := true
-	if self.singleValue != "" {
-		matched = false
-		if strings.ToLower(value) == self.singleValue {
+	if self.single != "" {
+		if strings.ToLower(value) == self.single {
 			return true
 		}
+		matched = false
 	}
 
 	if self.values != nil {
-		matched = false
 		v := strings.ToLower(value)
 		if _, ok := self.values[v]; ok {
 			return true
 		}
+		matched = false
 	}
 
-	if self.regexp != nil {
-		matched = false
-		if self.regexp.MatchString(value) {
-			return true
-		}
+	if self.regexp == nil {
+		return matched
 	}
-	return matched
+	return self.regexp.MatchString(value)
 }
 
 type AttrPolicyBuilder struct {
@@ -237,21 +234,21 @@ const (
 )
 
 // init initializes the maps if this has not been done already
-func (p *Policy) init() {
-	if p.initialized {
+func (self *Policy) init() {
+	if self.initialized {
 		return
 	}
 
-	p.elsAndAttrs = make(map[string]map[string][]attrPolicy)
-	p.elsMatchingAndAttrs = make(map[*regexp.Regexp]map[string][]attrPolicy)
-	p.globalAttrs = make(map[string][]attrPolicy)
-	p.allowURLSchemes = make(map[string][]urlPolicy)
-	p.allowURLSchemeRegexps = make([]*regexp.Regexp, 0)
-	p.setOfElementsAllowedWithoutAttrs = make(map[string]struct{})
-	p.setOfElementsToSkipContent = make(map[string]struct{})
-	p.setAttrs = make(map[string][]html.Attribute)
-	p.setAttrsIf = make(map[string][]setAttrPolicy)
-	p.initialized = true
+	self.elements = map[string]*element{}
+	self.matchingElements = map[*regexp.Regexp]*element{}
+	self.globalAttrs = map[string][]*attrPolicy{}
+	self.urlSchemes = map[string][]urlPolicy{}
+	self.urlSchemeRegexps = []*regexp.Regexp{}
+	self.withoutAttrs = map[string]struct{}{}
+	self.skipContent = map[string]struct{}{}
+	self.setAttrs = map[string][]html.Attribute{}
+	self.setAttrsIf = map[string][]*setAttrPolicy{}
+	self.initialized = true
 }
 
 // NewPolicy returns a blank policy with nothing allowed or permitted. This
@@ -259,12 +256,10 @@ func (p *Policy) init() {
 // AllowAttrs() and/or AllowElements() to construct the allowlist of HTML
 // elements and attributes.
 func NewPolicy() *Policy {
-	p := Policy{}
-
+	p := &Policy{}
 	p.addDefaultElementsWithoutAttrs()
 	p.addDefaultSkipElementContent()
-
-	return &p
+	return p
 }
 
 // SetCallbackForAttributes sets the callback function that will be called
@@ -272,26 +267,27 @@ func NewPolicy() *Policy {
 // add/remove/modify the element's attributes. If the callback returns nil or
 // empty array of html attributes then the attributes will not be included in
 // the output. SetCallbackForAttributes is not goroutine safe.
-func (p *Policy) SetCallbackForAttributes(cb func(*html.Token) []html.Attribute,
+func (self *Policy) SetCallbackForAttributes(
+	cb func(*html.Token) []html.Attribute,
 ) *Policy {
-	p.callbackAttr = cb
-	return p
+	self.callbackAttr = cb
+	return self
 }
 
 // RewriteTokenURL will rewrite any attribute of a resource downloading tag
 // (e.g. <a>, <img>, <script>, <iframe>) using the provided function.
-func (p *Policy) RewriteTokenURL(fn func(*html.Token, *url.URL) *url.URL,
+func (self *Policy) RewriteTokenURL(fn func(*html.Token, *url.URL) *url.URL,
 ) *Policy {
-	p.urlRewriter = fn
-	return p
+	self.urlRewriter = fn
+	return self
 }
 
 // RewriteURL will rewrite any attribute of a resource downloading tag
 // (e.g. <a>, <img>, <script>, <iframe>) using the provided function.
 //
 // Deprecated: Use RewriteTokenURL instead.
-func (p *Policy) RewriteURL(fn func(*url.URL)) *Policy {
-	return p.RewriteTokenURL(func(_ *html.Token, u *url.URL) *url.URL {
+func (self *Policy) RewriteURL(fn func(*url.URL)) *Policy {
+	return self.RewriteTokenURL(func(_ *html.Token, u *url.URL) *url.URL {
 		fn(u)
 		var empty url.URL
 		if *u == empty {
@@ -307,19 +303,18 @@ func (p *Policy) RewriteURL(fn func(*url.URL)) *Policy {
 //
 // The attribute policy is only added to the core policy when either Globally()
 // or OnElements(...) are called.
-func (p *Policy) AllowAttrs(attrNames ...string) *AttrPolicyBuilder {
-	p.init()
+func (self *Policy) AllowAttrs(attrNames ...string) *AttrPolicyBuilder {
+	self.init()
 
-	abp := AttrPolicyBuilder{
-		p:          p,
-		allowEmpty: false,
+	abp := &AttrPolicyBuilder{
+		p:         self,
+		attrNames: make([]string, 0, len(attrNames)),
 	}
 
 	for _, attrName := range attrNames {
 		abp.attrNames = append(abp.attrNames, strings.ToLower(attrName))
 	}
-
-	return &abp
+	return abp
 }
 
 // AllowDataAttributes permits all data attributes. We can't specify the name
@@ -333,8 +328,8 @@ func (p *Policy) AllowAttrs(attrNames ...string) *AttrPolicyBuilder {
 // data attribute and use that to automatically load some new window then you're giving
 // the author of a HTML fragment the means to open a malicious destination automatically.
 // Use with care!
-func (p *Policy) AllowDataAttributes() {
-	p.allowDataAttributes = true
+func (self *Policy) AllowDataAttributes() {
+	self.dataAttributes = true
 }
 
 // AllowComments allows comments.
@@ -349,81 +344,67 @@ func (p *Policy) AllowDataAttributes() {
 // package changes this then these will be considered, otherwise if you AllowComments
 // but provide a CDATA comment, then as per the documentation in x/net/html this will
 // be treated as a plain HTML comment.
-func (p *Policy) AllowComments() {
-	p.allowComments = true
+func (self *Policy) AllowComments() {
+	self.comments = true
 }
 
 // AllowNoAttrs says that attributes on element are optional.
 //
 // The attribute policy is only added to the core policy when OnElements(...)
 // are called.
-func (p *Policy) AllowNoAttrs() *AttrPolicyBuilder {
-	p.init()
-
-	abp := AttrPolicyBuilder{
-		p:          p,
-		allowEmpty: true,
-	}
-	return &abp
+func (self *Policy) AllowNoAttrs() *AttrPolicyBuilder {
+	self.init()
+	return &AttrPolicyBuilder{p: self, allowEmpty: true}
 }
 
 // AllowNoAttrs says that attributes on element are optional.
 //
 // The attribute policy is only added to the core policy when OnElements(...)
 // are called.
-func (abp *AttrPolicyBuilder) AllowNoAttrs() *AttrPolicyBuilder {
-	abp.allowEmpty = true
-	return abp
+func (self *AttrPolicyBuilder) AllowNoAttrs() *AttrPolicyBuilder {
+	self.allowEmpty = true
+	return self
 }
 
 // Matching allows a regular expression to be applied to a nascent attribute
 // policy, and returns the attribute policy.
-func (abp *AttrPolicyBuilder) Matching(regex *regexp.Regexp) *AttrPolicyBuilder {
-	abp.regexp = regex
-	return abp
+func (self *AttrPolicyBuilder) Matching(regex *regexp.Regexp) *AttrPolicyBuilder {
+	self.regexp = regex
+	return self
 }
 
 // WithValues allows given values and returns the attribute policy.
-func (abp *AttrPolicyBuilder) WithValues(values ...string) *AttrPolicyBuilder {
-	abp.values = values
-	return abp
+func (self *AttrPolicyBuilder) WithValues(values ...string) *AttrPolicyBuilder {
+	self.values = values
+	return self
 }
 
 // OnElements will bind an attribute policy to a given range of HTML elements
 // and return the updated policy
-func (abp *AttrPolicyBuilder) OnElements(elements ...string) *Policy {
-	for _, element := range elements {
-		element = strings.ToLower(element)
-
-		for _, attr := range abp.attrNames {
-			if _, ok := abp.p.elsAndAttrs[element]; !ok {
-				abp.p.elsAndAttrs[element] = make(map[string][]attrPolicy)
-			}
-			abp.p.elsAndAttrs[element][attr] = append(
-				abp.p.elsAndAttrs[element][attr], abp.attrPolicy())
+func (self *AttrPolicyBuilder) OnElements(names ...string) *Policy {
+	ap := self.attrPolicy()
+	for _, name := range names {
+		name = strings.ToLower(name)
+		for _, attr := range self.attrNames {
+			self.p.appendElement(name, attr, ap)
 		}
-
-		if abp.allowEmpty {
-			abp.p.setOfElementsAllowedWithoutAttrs[element] = struct{}{}
-
-			if _, ok := abp.p.elsAndAttrs[element]; !ok {
-				abp.p.elsAndAttrs[element] = make(map[string][]attrPolicy)
-			}
+		if self.allowEmpty {
+			self.p.allowElement(name)
+			self.p.withoutAttrs[name] = struct{}{}
 		}
 	}
-
-	return abp.p
+	return self.p
 }
 
-func (abp *AttrPolicyBuilder) attrPolicy() attrPolicy {
-	ap := attrPolicy{regexp: abp.regexp}
-	if n := len(abp.values); n == 1 {
-		ap.singleValue = abp.values[0]
-	} else if n > 1 {
+func (self *AttrPolicyBuilder) attrPolicy() *attrPolicy {
+	ap := &attrPolicy{regexp: self.regexp}
+	switch n := len(self.values); {
+	case n == 1:
+		ap.single = self.values[0]
+	case n > 1:
 		ap.values = make(map[string]struct{}, n)
-		for _, v := range abp.values {
-			v = strings.ToLower(v)
-			ap.values[v] = struct{}{}
+		for _, v := range self.values {
+			ap.values[strings.ToLower(v)] = struct{}{}
 		}
 	}
 	return ap
@@ -431,61 +412,48 @@ func (abp *AttrPolicyBuilder) attrPolicy() attrPolicy {
 
 // DeleteFromElements will unbind an attribute policy, previously binded to a
 // given range of HTML elements by OnElements, and return the updated policy.
-func (abp *AttrPolicyBuilder) DeleteFromElements(elements ...string) *Policy {
-	for _, element := range elements {
-		element = strings.ToLower(element)
-		if _, ok := abp.p.elsAndAttrs[element]; ok {
-			for _, attr := range abp.attrNames {
-				delete(abp.p.elsAndAttrs[element], attr)
-			}
-		}
-		if abp.allowEmpty {
-			delete(abp.p.setOfElementsAllowedWithoutAttrs, element)
+func (self *AttrPolicyBuilder) DeleteFromElements(names ...string) *Policy {
+	for _, name := range names {
+		name = strings.ToLower(name)
+		self.p.deleteElementAttrs(name, self.attrNames...)
+		if self.allowEmpty {
+			delete(self.p.withoutAttrs, name)
 		}
 	}
-	return abp.p
+	return self.p
 }
 
-// OnElementsMatching will bind an attribute policy to all elements matching a given regex
-// and return the updated policy
-func (abp *AttrPolicyBuilder) OnElementsMatching(regex *regexp.Regexp) *Policy {
-	for _, attr := range abp.attrNames {
-		if _, ok := abp.p.elsMatchingAndAttrs[regex]; !ok {
-			abp.p.elsMatchingAndAttrs[regex] = make(map[string][]attrPolicy)
-		}
-		abp.p.elsMatchingAndAttrs[regex][attr] = append(
-			abp.p.elsMatchingAndAttrs[regex][attr], abp.attrPolicy())
+// OnElementsMatching will bind an attribute policy to all elements matching a
+// given regex and return the updated policy
+func (self *AttrPolicyBuilder) OnElementsMatching(re *regexp.Regexp) *Policy {
+	ap := self.attrPolicy()
+	for _, attr := range self.attrNames {
+		self.p.appendMatching(re, attr, ap)
 	}
-
-	if abp.allowEmpty {
-		abp.p.setOfElementsMatchingAllowedWithoutAttrs = append(
-			abp.p.setOfElementsMatchingAllowedWithoutAttrs, regex)
-		if _, ok := abp.p.elsMatchingAndAttrs[regex]; !ok {
-			abp.p.elsMatchingAndAttrs[regex] = make(map[string][]attrPolicy)
-		}
+	if self.allowEmpty {
+		self.p.allowMatching(re)
+		self.p.matchingWithoutAttrs = append(self.p.matchingWithoutAttrs, re)
 	}
-	return abp.p
+	return self.p
 }
 
 // Globally will bind an attribute policy to all HTML elements and return the
 // updated policy
-func (abp *AttrPolicyBuilder) Globally() *Policy {
-	for _, attr := range abp.attrNames {
-		if _, ok := abp.p.globalAttrs[attr]; !ok {
-			abp.p.globalAttrs[attr] = []attrPolicy{}
-		}
-		abp.p.globalAttrs[attr] = append(abp.p.globalAttrs[attr], abp.attrPolicy())
+func (self *AttrPolicyBuilder) Globally() *Policy {
+	ap := self.attrPolicy()
+	for _, attr := range self.attrNames {
+		self.p.globalAttrs[attr] = append(self.p.globalAttrs[attr], ap)
 	}
-	return abp.p
+	return self.p
 }
 
 // DeleteFromGlobally will unbind an attribute policy, previously binded by
 // Globally, and return the updated policy.
-func (abp *AttrPolicyBuilder) DeleteFromGlobally() *Policy {
-	for _, attr := range abp.attrNames {
-		delete(abp.p.globalAttrs, attr)
+func (self *AttrPolicyBuilder) DeleteFromGlobally() *Policy {
+	for _, attr := range self.attrNames {
+		delete(self.p.globalAttrs, attr)
 	}
-	return abp.p
+	return self.p
 }
 
 // WithStyleHandler sets h as a custom sanitizer for inline styles and returns
@@ -494,43 +462,35 @@ func (abp *AttrPolicyBuilder) DeleteFromGlobally() *Policy {
 // The custom sanitizer returns sanitized content of given style attribute for
 // given tag. Returned empty string means style attribute is not allowed on this
 // tag.
-func (p *Policy) WithStyleHandler(h func(tag, style string) string) *Policy {
-	p.styleHandler = h
-	return p
+func (self *Policy) WithStyleHandler(h func(tag, style string) string) *Policy {
+	self.styleHandler = h
+	return self
 }
 
 // AllowElements will append HTML elements to the allowlist without applying an
 // attribute policy to those elements (the elements are permitted
 // sans-attributes)
-func (p *Policy) AllowElements(names ...string) *Policy {
-	p.init()
-
-	for _, element := range names {
-		element = strings.ToLower(element)
-
-		if _, ok := p.elsAndAttrs[element]; !ok {
-			p.elsAndAttrs[element] = make(map[string][]attrPolicy)
-		}
+func (self *Policy) AllowElements(names ...string) *Policy {
+	self.init()
+	for _, name := range names {
+		self.allowElement(strings.ToLower(name))
 	}
-
-	return p
+	return self
 }
 
 // AllowElementsMatching will append HTML elements to the allowlist if they
 // match a regexp.
-func (p *Policy) AllowElementsMatching(regex *regexp.Regexp) *Policy {
-	p.init()
-	if _, ok := p.elsMatchingAndAttrs[regex]; !ok {
-		p.elsMatchingAndAttrs[regex] = make(map[string][]attrPolicy)
-	}
-	return p
+func (self *Policy) AllowElementsMatching(re *regexp.Regexp) *Policy {
+	self.init()
+	self.allowMatching(re)
+	return self
 }
 
 // AllowURLSchemesMatching will append URL schemes to the allowlist if they
 // match a regexp.
-func (p *Policy) AllowURLSchemesMatching(r *regexp.Regexp) *Policy {
-	p.allowURLSchemeRegexps = append(p.allowURLSchemeRegexps, r)
-	return p
+func (self *Policy) AllowURLSchemesMatching(r *regexp.Regexp) *Policy {
+	self.urlSchemeRegexps = append(self.urlSchemeRegexps, r)
+	return self
 }
 
 // RewriteSrc will rewrite the src attribute of a resource downloading tag
@@ -555,20 +515,19 @@ func (p *Policy) AllowURLSchemesMatching(r *regexp.Regexp) *Policy {
 // This is a good practise to adopt as it prevents the content from being
 // able to set cookies on the main domain and thus prevents the content on
 // the main domain from being able to read those cookies.
-func (p *Policy) RewriteSrc(fn func(*url.URL)) *Policy {
-	p.srcRewriter = fn
-	return p
+func (self *Policy) RewriteSrc(fn func(*url.URL)) *Policy {
+	self.srcRewriter = fn
+	return self
 }
 
 // RequireNoFollowOnLinks will result in all a, area, link tags having a
 // rel="nofollow"added to them if one does not already exist
 //
 // Note: This requires p.RequireParseableURLs(true) and will enable it.
-func (p *Policy) RequireNoFollowOnLinks(require bool) *Policy {
-	p.requireNoFollow = require
-	p.requireParseableURLs = true
-
-	return p
+func (self *Policy) RequireNoFollowOnLinks(require bool) *Policy {
+	self.relNoFollow = require
+	self.parseableURLs = true
+	return self
 }
 
 // RequireNoFollowOnFullyQualifiedLinks will result in all a, area, and link
@@ -577,22 +536,20 @@ func (p *Policy) RequireNoFollowOnLinks(require bool) *Policy {
 // exist
 //
 // Note: This requires p.RequireParseableURLs(true) and will enable it.
-func (p *Policy) RequireNoFollowOnFullyQualifiedLinks(require bool) *Policy {
-	p.requireNoFollowFullyQualifiedLinks = require
-	p.requireParseableURLs = true
-
-	return p
+func (self *Policy) RequireNoFollowOnFullyQualifiedLinks(require bool) *Policy {
+	self.relNoFollowAbsOnly = require
+	self.parseableURLs = true
+	return self
 }
 
 // RequireNoReferrerOnLinks will result in all a, area, and link tags having a
 // rel="noreferrrer" added to them if one does not already exist
 //
 // Note: This requires p.RequireParseableURLs(true) and will enable it.
-func (p *Policy) RequireNoReferrerOnLinks(require bool) *Policy {
-	p.requireNoReferrer = require
-	p.requireParseableURLs = true
-
-	return p
+func (self *Policy) RequireNoReferrerOnLinks(require bool) *Policy {
+	self.relNoReferrer = require
+	self.parseableURLs = true
+	return self
 }
 
 // RequireNoReferrerOnFullyQualifiedLinks will result in all a, area, and link
@@ -601,20 +558,18 @@ func (p *Policy) RequireNoReferrerOnLinks(require bool) *Policy {
 // exist
 //
 // Note: This requires p.RequireParseableURLs(true) and will enable it.
-func (p *Policy) RequireNoReferrerOnFullyQualifiedLinks(require bool) *Policy {
-	p.requireNoReferrerFullyQualifiedLinks = require
-	p.requireParseableURLs = true
-
-	return p
+func (self *Policy) RequireNoReferrerOnFullyQualifiedLinks(require bool) *Policy {
+	self.relNoReferrerAbsOnly = require
+	self.parseableURLs = true
+	return self
 }
 
 // RequireCrossOriginAnonymous will result in all audio, img, link, script, and
 // video tags having a crossorigin="anonymous" added to them if one does not
 // already exist
-func (p *Policy) RequireCrossOriginAnonymous(require bool) *Policy {
-	p.requireCrossOriginAnonymous = require
-
-	return p
+func (self *Policy) RequireCrossOriginAnonymous(require bool) *Policy {
+	self.crossoriginAnonymous = require
+	return self
 }
 
 // AddTargetBlankToFullyQualifiedLinks will result in all a, area and link tags
@@ -622,11 +577,10 @@ func (p *Policy) RequireCrossOriginAnonymous(require bool) *Policy {
 // host) having a target="_blank" added to them if one does not already exist
 //
 // Note: This requires p.RequireParseableURLs(true) and will enable it.
-func (p *Policy) AddTargetBlankToFullyQualifiedLinks(require bool) *Policy {
-	p.addTargetBlankToFullyQualifiedLinks = require
-	p.requireParseableURLs = true
-
-	return p
+func (self *Policy) AddTargetBlankToFullyQualifiedLinks(require bool) *Policy {
+	self.targetBlank = require
+	self.parseableURLs = true
+	return self
 }
 
 // RequireParseableURLs will result in all URLs requiring that they be parseable
@@ -638,106 +592,96 @@ func (p *Policy) AddTargetBlankToFullyQualifiedLinks(require bool) *Policy {
 // - img.src
 // - link.href
 // - script.src
-func (p *Policy) RequireParseableURLs(require bool) *Policy {
-	p.requireParseableURLs = require
-
-	return p
+func (self *Policy) RequireParseableURLs(require bool) *Policy {
+	self.parseableURLs = require
+	return self
 }
 
 // AllowRelativeURLs enables RequireParseableURLs and then permits URLs that
 // are parseable, have no schema information and url.IsAbs() returns false
 // This permits local URLs
-func (p *Policy) AllowRelativeURLs(require bool) *Policy {
-	p.RequireParseableURLs(true)
-	p.allowRelativeURLs = require
-
-	return p
+func (self *Policy) AllowRelativeURLs(require bool) *Policy {
+	self.RequireParseableURLs(true)
+	self.relativeURLs = require
+	return self
 }
 
 // AllowURLSchemes will append URL schemes to the allowlist
 // Example: p.AllowURLSchemes("mailto", "http", "https")
-func (p *Policy) AllowURLSchemes(schemes ...string) *Policy {
-	p.init()
-
-	p.RequireParseableURLs(true)
+func (self *Policy) AllowURLSchemes(schemes ...string) *Policy {
+	self.init()
+	self.RequireParseableURLs(true)
 
 	for _, scheme := range schemes {
-		scheme = strings.ToLower(scheme)
-
 		// Allow all URLs with matching scheme.
-		p.allowURLSchemes[scheme] = nil
+		self.urlSchemes[strings.ToLower(scheme)] = nil
 	}
-
-	return p
+	return self
 }
 
 // AllowURLSchemeWithCustomPolicy will append URL schemes with
 // a custom URL policy to the allowlist.
 // Only the URLs with matching schema and urlPolicy(url)
 // returning true will be allowed.
-func (p *Policy) AllowURLSchemeWithCustomPolicy(
-	scheme string,
+func (self *Policy) AllowURLSchemeWithCustomPolicy(scheme string,
 	urlPolicy func(url *url.URL) (allowUrl bool),
 ) *Policy {
-	p.init()
-
-	p.RequireParseableURLs(true)
+	self.init()
+	self.RequireParseableURLs(true)
 
 	scheme = strings.ToLower(scheme)
-
-	p.allowURLSchemes[scheme] = append(p.allowURLSchemes[scheme], urlPolicy)
-
-	return p
+	self.urlSchemes[scheme] = append(self.urlSchemes[scheme], urlPolicy)
+	return self
 }
 
 // RequireSandboxOnIFrame will result in all iframe tags having a sandbox="" tag
 // Any sandbox values not specified here will be filtered from the generated HTML
-func (p *Policy) RequireSandboxOnIFrame(vals ...SandboxValue) {
-	p.requireSandboxOnIFrame = make(map[string]struct{})
+func (self *Policy) RequireSandboxOnIFrame(vals ...SandboxValue) {
+	self.sandboxIframeAttrs = make(map[string]struct{}, len(vals))
 
 	for _, val := range vals {
 		switch val {
 		case SandboxAllowDownloads:
-			p.requireSandboxOnIFrame["allow-downloads"] = struct{}{}
+			self.sandboxIframeAttrs["allow-downloads"] = struct{}{}
 
 		case SandboxAllowDownloadsWithoutUserActivation:
-			p.requireSandboxOnIFrame["allow-downloads-without-user-activation"] = struct{}{}
+			self.sandboxIframeAttrs["allow-downloads-without-user-activation"] = struct{}{}
 
 		case SandboxAllowForms:
-			p.requireSandboxOnIFrame["allow-forms"] = struct{}{}
+			self.sandboxIframeAttrs["allow-forms"] = struct{}{}
 
 		case SandboxAllowModals:
-			p.requireSandboxOnIFrame["allow-modals"] = struct{}{}
+			self.sandboxIframeAttrs["allow-modals"] = struct{}{}
 
 		case SandboxAllowOrientationLock:
-			p.requireSandboxOnIFrame["allow-orientation-lock"] = struct{}{}
+			self.sandboxIframeAttrs["allow-orientation-lock"] = struct{}{}
 
 		case SandboxAllowPointerLock:
-			p.requireSandboxOnIFrame["allow-pointer-lock"] = struct{}{}
+			self.sandboxIframeAttrs["allow-pointer-lock"] = struct{}{}
 
 		case SandboxAllowPopups:
-			p.requireSandboxOnIFrame["allow-popups"] = struct{}{}
+			self.sandboxIframeAttrs["allow-popups"] = struct{}{}
 
 		case SandboxAllowPopupsToEscapeSandbox:
-			p.requireSandboxOnIFrame["allow-popups-to-escape-sandbox"] = struct{}{}
+			self.sandboxIframeAttrs["allow-popups-to-escape-sandbox"] = struct{}{}
 
 		case SandboxAllowPresentation:
-			p.requireSandboxOnIFrame["allow-presentation"] = struct{}{}
+			self.sandboxIframeAttrs["allow-presentation"] = struct{}{}
 
 		case SandboxAllowSameOrigin:
-			p.requireSandboxOnIFrame["allow-same-origin"] = struct{}{}
+			self.sandboxIframeAttrs["allow-same-origin"] = struct{}{}
 
 		case SandboxAllowScripts:
-			p.requireSandboxOnIFrame["allow-scripts"] = struct{}{}
+			self.sandboxIframeAttrs["allow-scripts"] = struct{}{}
 
 		case SandboxAllowStorageAccessByUserActivation:
-			p.requireSandboxOnIFrame["allow-storage-access-by-user-activation"] = struct{}{}
+			self.sandboxIframeAttrs["allow-storage-access-by-user-activation"] = struct{}{}
 
 		case SandboxAllowTopNavigation:
-			p.requireSandboxOnIFrame["allow-top-navigation"] = struct{}{}
+			self.sandboxIframeAttrs["allow-top-navigation"] = struct{}{}
 
 		case SandboxAllowTopNavigationByUserActivation:
-			p.requireSandboxOnIFrame["allow-top-navigation-by-user-activation"] = struct{}{}
+			self.sandboxIframeAttrs["allow-top-navigation-by-user-activation"] = struct{}{}
 		}
 	}
 }
@@ -752,39 +696,30 @@ func (p *Policy) RequireSandboxOnIFrame(vals ...SandboxValue) {
 // with the default value of false, but you may wish to sanitize this to
 // " Hello  World " by setting AddSpaceWhenStrippingTag to true as this would
 // retain the intent of the text.
-func (p *Policy) AddSpaceWhenStrippingTag(allow bool) *Policy {
-	p.addSpaces = allow
-
-	return p
+func (self *Policy) AddSpaceWhenStrippingTag(allow bool) *Policy {
+	self.addSpaces = allow
+	return self
 }
 
 // SkipElementsContent adds the HTML elements whose tags is needed to be removed
 // with its content, if whose tags are not allowed. For allowed tags only their
 // content be removed.
-func (p *Policy) SkipElementsContent(names ...string) *Policy {
-	p.init()
-
+func (self *Policy) SkipElementsContent(names ...string) *Policy {
+	self.init()
 	for _, element := range names {
-		element = strings.ToLower(element)
-
-		if _, ok := p.setOfElementsToSkipContent[element]; !ok {
-			p.setOfElementsToSkipContent[element] = struct{}{}
-		}
+		self.skipContent[strings.ToLower(element)] = struct{}{}
 	}
-
-	return p
+	return self
 }
 
 // AllowElementsContent marks the HTML elements whose content should be
 // retained after removing the tag.
-func (p *Policy) AllowElementsContent(names ...string) *Policy {
-	p.init()
-
+func (self *Policy) AllowElementsContent(names ...string) *Policy {
+	self.init()
 	for _, element := range names {
-		delete(p.setOfElementsToSkipContent, strings.ToLower(element))
+		delete(self.skipContent, strings.ToLower(element))
 	}
-
-	return p
+	return self
 }
 
 // AllowUnsafe permits fundamentally unsafe elements.
@@ -798,128 +733,8 @@ func (p *Policy) AllowElementsContent(names ...string) *Policy {
 // policy declares them. However this is not recommended under any circumstance
 // and can lead to XSS being rendered thus defeating the purpose of using a
 // HTML sanitizer.
-func (p *Policy) AllowUnsafe(allowUnsafe bool) *Policy {
-	p.init()
-	p.allowUnsafe = allowUnsafe
-	return p
-}
-
-// addDefaultElementsWithoutAttrs adds the HTML elements that we know are valid
-// without any attributes to an internal map.
-// i.e. we know that <table> is valid, but <bdo> isn't valid as the "dir" attr
-// is mandatory
-func (p *Policy) addDefaultElementsWithoutAttrs() {
-	p.init()
-
-	p.setOfElementsAllowedWithoutAttrs["abbr"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["acronym"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["address"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["article"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["aside"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["audio"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["b"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["bdi"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["blockquote"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["body"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["br"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["button"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["canvas"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["caption"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["center"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["cite"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["code"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["col"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["colgroup"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["datalist"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["dd"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["del"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["details"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["dfn"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["div"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["dl"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["dt"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["em"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["fieldset"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["figcaption"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["figure"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["footer"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["h1"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["h2"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["h3"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["h4"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["h5"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["h6"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["head"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["header"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["hgroup"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["hr"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["html"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["i"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["ins"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["kbd"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["li"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["mark"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["marquee"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["nav"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["ol"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["optgroup"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["option"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["p"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["picture"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["pre"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["q"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["rp"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["rt"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["ruby"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["s"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["samp"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["script"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["section"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["select"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["small"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["span"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["strike"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["strong"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["style"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["sub"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["summary"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["sup"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["svg"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["table"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["tbody"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["td"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["textarea"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["tfoot"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["th"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["thead"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["title"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["time"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["tr"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["tt"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["u"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["ul"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["var"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["video"] = struct{}{}
-	p.setOfElementsAllowedWithoutAttrs["wbr"] = struct{}{}
-}
-
-// addDefaultSkipElementContent adds the HTML elements that we should skip
-// rendering the character content of, if the element itself is not allowed.
-// This is all character data that the end user would not normally see.
-// i.e. if we exclude a <script> tag then we shouldn't render the JavaScript or
-// anything else until we encounter the closing </script> tag.
-func (p *Policy) addDefaultSkipElementContent() {
-	p.init()
-
-	p.setOfElementsToSkipContent["frame"] = struct{}{}
-	p.setOfElementsToSkipContent["frameset"] = struct{}{}
-	p.setOfElementsToSkipContent["iframe"] = struct{}{}
-	p.setOfElementsToSkipContent["noembed"] = struct{}{}
-	p.setOfElementsToSkipContent["noframes"] = struct{}{}
-	p.setOfElementsToSkipContent["noscript"] = struct{}{}
-	p.setOfElementsToSkipContent["nostyle"] = struct{}{}
-	p.setOfElementsToSkipContent["object"] = struct{}{}
-	p.setOfElementsToSkipContent["script"] = struct{}{}
-	p.setOfElementsToSkipContent["style"] = struct{}{}
-	p.setOfElementsToSkipContent["title"] = struct{}{}
+func (self *Policy) AllowUnsafe(allowUnsafe bool) *Policy {
+	self.init()
+	self.unsafe = allowUnsafe
+	return self
 }

@@ -17,16 +17,18 @@ type setAttrPolicy struct {
 	cond PolicyCond
 }
 
-func (self *setAttrPolicy) Match(t *token) bool {
-	return self.cond == nil || self.cond(t)
+func (self *setAttrPolicy) SetIfMatch(t *token) {
+	if self.cond == nil || self.cond(t) {
+		t.SetAttr(self.attr)
+	}
 }
 
 // SetAttr says that HTML attribute with name and value must be added to
 // attributes when OnElements(...) is called.
-func (p *Policy) SetAttr(name, value string) Attribute {
-	p.init()
-	return Attribute{
-		p:    p,
+func (self *Policy) SetAttr(name, value string) *Attribute {
+	self.init()
+	return &Attribute{
+		p:    self,
 		attr: html.Attribute{Key: strings.ToLower(name), Val: value},
 	}
 }
@@ -34,34 +36,34 @@ func (p *Policy) SetAttr(name, value string) Attribute {
 // SetAttrIf sets that HTML attribute with given name and value must be added to
 // attributes when OnElements(...) is called, if given cond evaluates to true.
 // If it evaluates to false, this policy does nothing.
-func (p *Policy) SetAttrIf(name, value string, cond PolicyCond) Attribute {
-	return p.SetAttr(name, value).withCond(cond)
+func (self *Policy) SetAttrIf(name, value string, cond PolicyCond) *Attribute {
+	return self.SetAttr(name, value).withCond(cond)
 }
 
-func (self Attribute) withCond(cond PolicyCond) Attribute {
+func (self *Attribute) withCond(cond PolicyCond) *Attribute {
 	self.cond = cond
 	return self
 }
 
 // OnElements will set attribute on a given range of HTML elements and return
 // the updated policy
-func (self Attribute) OnElements(elements ...string) *Policy {
+func (self *Attribute) OnElements(names ...string) *Policy {
 	if self.attr.Key == "" {
 		return self.p
 	}
 
-	for _, element := range elements {
-		element = strings.ToLower(element)
-		switch self.cond {
-		case nil:
-			self.p.setAttrs[element] = append(self.p.setAttrs[element], self.attr)
-		default:
-			self.p.setAttrsIf[element] = append(self.p.setAttrsIf[element],
-				setAttrPolicy{
-					attr: self.attr,
-					cond: self.cond,
-				})
+	if self.cond == nil {
+		for _, name := range names {
+			name = strings.ToLower(name)
+			self.p.setAttrs[name] = append(self.p.setAttrs[name], self.attr)
 		}
+		return self.p
+	}
+
+	ap := &setAttrPolicy{attr: self.attr, cond: self.cond}
+	for _, name := range names {
+		name = strings.ToLower(name)
+		self.p.setAttrsIf[name] = append(self.p.setAttrsIf[name], ap)
 	}
 	return self.p
 }

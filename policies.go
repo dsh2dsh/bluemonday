@@ -29,20 +29,14 @@
 
 package bluemonday
 
-import (
-	"regexp"
-)
+import "regexp"
 
 // StrictPolicy returns an empty policy, which will effectively strip all HTML
 // elements and their attributes from a document.
-func StrictPolicy() *Policy {
-	return NewPolicy()
-}
+func StrictPolicy() *Policy { return NewPolicy() }
 
-// StripTagsPolicy is DEPRECATED. Use StrictPolicy instead.
-func StripTagsPolicy() *Policy {
-	return StrictPolicy()
-}
+// Deprecated: use StrictPolicy instead.
+func StripTagsPolicy() *Policy { return StrictPolicy() }
 
 // UGCPolicy returns a policy aimed at user generated content that is a result
 // of HTML WYSIWYG tools and Markdown conversions.

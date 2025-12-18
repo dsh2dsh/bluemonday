@@ -121,6 +121,116 @@ var (
 	// within the AllowDataURIImages func
 	dataURIImagePrefix = regexp.MustCompile(
 		`^image/(gif|jpeg|png|svg\+xml|webp);base64,`)
+
+	// defWithoutAttrs contains elements we know are valid without any attributes.
+	// i.e. we know that <table> is valid, but <bdo> isn't valid as the "dir" attr
+	// is mandatory.
+	defWithoutAttrs = [...]string{
+		"abbr",
+		"acronym",
+		"address",
+		"article",
+		"aside",
+		"audio",
+		"b",
+		"bdi",
+		"blockquote",
+		"body",
+		"br",
+		"button",
+		"canvas",
+		"caption",
+		"center",
+		"cite",
+		"code",
+		"col",
+		"colgroup",
+		"datalist",
+		"dd",
+		"del",
+		"details",
+		"dfn",
+		"div",
+		"dl",
+		"dt",
+		"em",
+		"fieldset",
+		"figcaption",
+		"figure",
+		"footer",
+		"h1", "h2", "h3", "h4", "h5", "h6",
+		"head",
+		"header",
+		"hgroup",
+		"hr",
+		"html",
+		"i",
+		"ins",
+		"kbd",
+		"li",
+		"mark",
+		"marquee",
+		"nav",
+		"ol",
+		"optgroup",
+		"option",
+		"p",
+		"picture",
+		"pre",
+		"q",
+		"rp",
+		"rt",
+		"ruby",
+		"s",
+		"samp",
+		"script",
+		"section",
+		"select",
+		"small",
+		"span",
+		"strike",
+		"strong",
+		"style",
+		"sub",
+		"summary",
+		"sup",
+		"svg",
+		"table",
+		"tbody",
+		"td",
+		"textarea",
+		"tfoot",
+		"th",
+		"thead",
+		"title",
+		"time",
+		"tr",
+		"tt",
+		"u",
+		"ul",
+		"var",
+		"video",
+		"wbr",
+	}
+
+	// defSkipContent contains list of elements we should skip rendering the
+	// character content of, if the element itself is not allowed. This is all
+	// character data that the end user would not normally see. i.e. if we exclude
+	// a <script> tag then we shouldn't render the JavaScript or anything else
+	// until we encounter the closing </script> tag.
+	defSkipContent = [...]string{
+		"frame",
+		"frameset",
+		"iframe",
+		"noembed",
+		"noframes",
+		"noscript",
+		"nostyle",
+		"object",
+		"script",
+		"style",
+		"title",
+	}
 )
 
 // CellAlign handles the `align` attribute
@@ -148,28 +258,28 @@ func ListType() []string { return listType[:] }
 // on "a", "area" and "link" (if you have allowed those elements) and will
 // ensure that the URL values are parseable and either relative or belong to the
 // "mailto", "http", or "https" schemes
-func (p *Policy) AllowStandardURLs() {
+func (self *Policy) AllowStandardURLs() {
 	// URLs must be parseable by net/url.Parse()
-	p.RequireParseableURLs(true)
+	self.RequireParseableURLs(true)
 
 	// !url.IsAbs() is permitted
-	p.AllowRelativeURLs(true)
+	self.AllowRelativeURLs(true)
 
 	// Most common URL schemes only
-	p.AllowURLSchemes("mailto", "http", "https")
+	self.AllowURLSchemes("mailto", "http", "https")
 
 	// For linking elements we will add rel="nofollow" if it does not already exist
 	// This applies to "a" "area" "link"
-	p.RequireNoFollowOnLinks(true)
+	self.RequireNoFollowOnLinks(true)
 }
 
 // AllowStandardAttributes will enable "id", "title" and the language specific
 // attributes "dir" and "lang" on all elements that are allowed
-func (p *Policy) AllowStandardAttributes() {
+func (self *Policy) AllowStandardAttributes() {
 	// "dir" "lang" are permitted as both language attributes affect charsets
 	// and direction of text.
-	p.AllowAttrs("dir").WithValues(Direction()...).Globally()
-	p.AllowAttrs(
+	self.AllowAttrs("dir").WithValues(Direction()...).Globally()
+	self.AllowAttrs(
 		"lang",
 	).Matching(regexp.MustCompile(`^[a-zA-Z]{2,20}$`)).Globally()
 
@@ -178,35 +288,35 @@ func (p *Policy) AllowStandardAttributes() {
 	// This does create a risk that JavaScript and CSS within your web page
 	// might identify the wrong elements. Ensure that you select things
 	// accurately
-	p.AllowAttrs("id").Matching(
+	self.AllowAttrs("id").Matching(
 		regexp.MustCompile(`^[a-zA-Z0-9\:\-_\.]+$`),
 	).Globally()
 
 	// "title" is permitted as it improves accessibility.
-	p.AllowAttrs("title").Matching(Paragraph).Globally()
+	self.AllowAttrs("title").Matching(Paragraph).Globally()
 }
 
 // AllowStyling presently enables the class attribute globally.
 //
 // Note: When bluemonday ships a CSS parser and we can safely sanitise that,
 // this will also allow sanitized styling of elements via the style attribute.
-func (p *Policy) AllowStyling() {
+func (self *Policy) AllowStyling() {
 	// "class" is permitted globally
-	p.AllowAttrs("class").Matching(SpaceSeparatedTokens).Globally()
+	self.AllowAttrs("class").Matching(SpaceSeparatedTokens).Globally()
 }
 
 // AllowImages enables the img element and some popular attributes. It will also
 // ensure that URL values are parseable. This helper does not enable data URI
 // images, for that you should also use the AllowDataURIImages() helper.
-func (p *Policy) AllowImages() {
+func (self *Policy) AllowImages() {
 	// "img" is permitted
-	p.AllowAttrs("align").WithValues(ImageAlign()...).OnElements("img")
-	p.AllowAttrs("alt").Matching(Paragraph).OnElements("img")
-	p.AllowAttrs("height", "width").Matching(NumberOrPercent).OnElements("img")
+	self.AllowAttrs("align").WithValues(ImageAlign()...).OnElements("img")
+	self.AllowAttrs("alt").Matching(Paragraph).OnElements("img")
+	self.AllowAttrs("height", "width").Matching(NumberOrPercent).OnElements("img")
 
 	// Standard URLs enabled
-	p.AllowStandardURLs()
-	p.AllowAttrs("src", "srcset").OnElements("img")
+	self.AllowStandardURLs()
+	self.AllowAttrs("src", "srcset").OnElements("img")
 }
 
 // AllowDataURIImages permits the use of inline images defined in RFC2397
@@ -224,12 +334,12 @@ func (p *Policy) AllowImages() {
 // only permit them on content you already trust.
 // http://palizine.plynt.com/issues/2010Oct/bypass-xss-filters/
 // https://capec.mitre.org/data/definitions/244.html
-func (p *Policy) AllowDataURIImages() {
+func (self *Policy) AllowDataURIImages() {
 	// URLs must be parseable by net/url.Parse()
-	p.RequireParseableURLs(true)
+	self.RequireParseableURLs(true)
 
 	// Supply a function to validate images contained within data URI
-	p.AllowURLSchemeWithCustomPolicy(
+	self.AllowURLSchemeWithCustomPolicy(
 		"data",
 		func(url *url.URL) (allowUrl bool) {
 			if url.RawQuery != "" || url.Fragment != "" {
@@ -249,71 +359,94 @@ func (p *Policy) AllowDataURIImages() {
 
 // AllowLists will enabled ordered and unordered lists, as well as definition
 // lists
-func (p *Policy) AllowLists() {
+func (self *Policy) AllowLists() {
 	// "ol" "ul" are permitted
-	p.AllowAttrs("type").WithValues(ListType()...).OnElements("ol", "ul")
+	self.AllowAttrs("type").WithValues(ListType()...).OnElements("ol", "ul")
 
 	// "li" is permitted
-	p.AllowAttrs("type").WithValues(ListType()...).OnElements("li")
-	p.AllowAttrs("value").Matching(Integer).OnElements("li")
+	self.AllowAttrs("type").WithValues(ListType()...).OnElements("li")
+	self.AllowAttrs("value").Matching(Integer).OnElements("li")
 
 	// "dl" "dt" "dd" are permitted
-	p.AllowElements("dl", "dt", "dd")
+	self.AllowElements("dl", "dt", "dd")
 }
 
 // AllowTables will enable a rich set of elements and attributes to describe
 // HTML tables
-func (p *Policy) AllowTables() {
+func (self *Policy) AllowTables() {
 	// "table" is permitted
-	p.AllowAttrs("height", "width").Matching(NumberOrPercent).OnElements("table")
-	p.AllowAttrs("summary").Matching(Paragraph).OnElements("table")
+	self.AllowAttrs("height", "width").Matching(NumberOrPercent).OnElements("table")
+	self.AllowAttrs("summary").Matching(Paragraph).OnElements("table")
 
 	// "caption" is permitted
-	p.AllowElements("caption")
+	self.AllowElements("caption")
 
 	// "col" "colgroup" are permitted
-	p.AllowAttrs("align").WithValues(CellAlign()...).
+	self.AllowAttrs("align").WithValues(CellAlign()...).
 		OnElements("col", "colgroup")
-	p.AllowAttrs("height", "width").Matching(
+	self.AllowAttrs("height", "width").Matching(
 		NumberOrPercent,
 	).OnElements("col", "colgroup")
-	p.AllowAttrs("span").Matching(Integer).OnElements("colgroup", "col")
-	p.AllowAttrs("valign").WithValues(CellVerticalAlign()...).
+	self.AllowAttrs("span").Matching(Integer).OnElements("colgroup", "col")
+	self.AllowAttrs("valign").WithValues(CellVerticalAlign()...).
 		OnElements("col", "colgroup")
 
 	// "thead" "tr" are permitted
-	p.AllowAttrs("align").WithValues(CellAlign()...).OnElements("thead", "tr")
-	p.AllowAttrs("valign").WithValues(CellVerticalAlign()...).
+	self.AllowAttrs("align").WithValues(CellAlign()...).OnElements("thead", "tr")
+	self.AllowAttrs("valign").WithValues(CellVerticalAlign()...).
 		OnElements("thead", "tr")
 
 	// "td" "th" are permitted
-	p.AllowAttrs("abbr").Matching(Paragraph).OnElements("td", "th")
-	p.AllowAttrs("align").WithValues(CellAlign()...).OnElements("td", "th")
-	p.AllowAttrs("colspan", "rowspan").Matching(Integer).OnElements("td", "th")
-	p.AllowAttrs("headers").Matching(
+	self.AllowAttrs("abbr").Matching(Paragraph).OnElements("td", "th")
+	self.AllowAttrs("align").WithValues(CellAlign()...).OnElements("td", "th")
+	self.AllowAttrs("colspan", "rowspan").Matching(Integer).OnElements("td", "th")
+	self.AllowAttrs("headers").Matching(
 		SpaceSeparatedTokens,
 	).OnElements("td", "th")
-	p.AllowAttrs("height", "width").Matching(
+	self.AllowAttrs("height", "width").Matching(
 		NumberOrPercent,
 	).OnElements("td", "th")
-	p.AllowAttrs(
+	self.AllowAttrs(
 		"scope",
 	).WithValues(
 		"row", "col", "rowgroup", "colgroup",
 	).OnElements("td", "th")
-	p.AllowAttrs("valign").WithValues(CellVerticalAlign()...).
+	self.AllowAttrs("valign").WithValues(CellVerticalAlign()...).
 		OnElements("td", "th")
-	p.AllowAttrs("nowrap").WithValues(
+	self.AllowAttrs("nowrap").WithValues(
 		"", "nowrap",
 	).OnElements("td", "th")
 
 	// "tbody" "tfoot"
-	p.AllowAttrs("align").WithValues(CellAlign()...).OnElements("tbody", "tfoot")
-	p.AllowAttrs("valign").WithValues(CellVerticalAlign()...).
+	self.AllowAttrs("align").WithValues(CellAlign()...).OnElements("tbody", "tfoot")
+	self.AllowAttrs("valign").WithValues(CellVerticalAlign()...).
 		OnElements("tbody", "tfoot")
 }
 
-func (p *Policy) AllowIFrames(vals ...SandboxValue) {
-	p.AllowAttrs("sandbox").OnElements("iframe")
-	p.RequireSandboxOnIFrame(vals...)
+func (self *Policy) AllowIFrames(vals ...SandboxValue) {
+	self.AllowAttrs("sandbox").OnElements("iframe")
+	self.RequireSandboxOnIFrame(vals...)
+}
+
+// addDefaultElementsWithoutAttrs adds the HTML elements that we know are valid
+// without any attributes to an internal map.
+// i.e. we know that <table> is valid, but <bdo> isn't valid as the "dir" attr
+// is mandatory
+func (self *Policy) addDefaultElementsWithoutAttrs() {
+	self.init()
+	for _, name := range defWithoutAttrs {
+		self.withoutAttrs[name] = struct{}{}
+	}
+}
+
+// addDefaultSkipElementContent adds the HTML elements that we should skip
+// rendering the character content of, if the element itself is not allowed.
+// This is all character data that the end user would not normally see.
+// i.e. if we exclude a <script> tag then we shouldn't render the JavaScript or
+// anything else until we encounter the closing </script> tag.
+func (self *Policy) addDefaultSkipElementContent() {
+	self.init()
+	for _, name := range defSkipContent {
+		self.skipContent[name] = struct{}{}
+	}
 }

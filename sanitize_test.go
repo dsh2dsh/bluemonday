@@ -33,6 +33,7 @@ import (
 	"bytes"
 	_ "embed"
 	"encoding/base64"
+	"io"
 	"net/url"
 	"regexp"
 	"slices"
@@ -59,10 +60,13 @@ func BenchmarkSanitize(b *testing.B) {
 		AddTargetBlankToFullyQualifiedLinks(true).
 		RequireNoReferrerOnLinks(true)
 
+	var r strings.Reader
+
 	b.ReportAllocs()
 	for b.Loop() {
 		for _, s := range inputs {
-			p.Sanitize(s)
+			r.Reset(s)
+			p.SanitizeReaderToWriter(&r, io.Discard)
 		}
 	}
 }
