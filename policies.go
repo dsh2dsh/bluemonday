@@ -38,6 +38,24 @@ func StrictPolicy() *Policy { return NewPolicy() }
 // Deprecated: use StrictPolicy instead.
 func StripTagsPolicy() *Policy { return StrictPolicy() }
 
+// OpenPolicy returns a policy, which pass almost all HTML elements and their
+// attributes as is. It validates and strips invalid URLs by default and calls
+// callbacks. Such policy can be used to just modify (proxyfy) URLs and pass
+// everything else as is, expecting the document is already sanitized or is from
+// trusted source.
+//
+// Don't use this policy, unless you sure the input document is safe!
+func OpenPolicy() *Policy {
+	p := NewPolicy()
+	p.open = true
+
+	p.AllowComments()
+	p.AllowDataAttributes()
+	p.AllowRelativeURLs(true)
+	p.AllowUnsafe(true)
+	return p
+}
+
 // UGCPolicy returns a policy aimed at user generated content that is a result
 // of HTML WYSIWYG tools and Markdown conversions.
 //

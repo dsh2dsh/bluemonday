@@ -2957,8 +2957,8 @@ func TestSrcSet(t *testing.T) {
 }
 
 func TestSetAttr(t *testing.T) {
-	p := NewPolicy().AllowAttrs("src").OnElements("img").
-		SetAttr("loading", "lazy").OnElements("img")
+	p := NewPolicy().AllowAttrs("src").OnElements("img")
+	p.SetAttr("loading", "lazy").OnElements("img")
 
 	input := `<img src="giraffe.gif"/>`
 	expected := `<img src="giraffe.gif" loading="lazy"/>`
@@ -2967,9 +2967,24 @@ func TestSetAttr(t *testing.T) {
 	input = `<img src="giraffe.gif" loading="lazy"/>`
 	assert.Equal(t, input, p.Sanitize(input))
 
-	p.AllowAttrs("loading", "lazy").OnElements("img")
+	p.AllowAttrs("loading").OnElements("img")
 	assert.Equal(t, input, p.Sanitize(input))
 
 	input = `<img src="giraffe.gif" loading="eager"/>`
 	assert.Equal(t, expected, p.Sanitize(input))
+}
+
+func BenchmarkOpenPolicy(b *testing.B) {
+	inputs := []string{githubHTML, wikipediaHTML}
+
+	p := OpenPolicy()
+	var r strings.Reader
+
+	b.ReportAllocs()
+	for b.Loop() {
+		for _, s := range inputs {
+			r.Reset(s)
+			p.SanitizeReaderToWriter(&r, io.Discard)
+		}
+	}
 }

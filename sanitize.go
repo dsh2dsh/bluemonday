@@ -134,11 +134,11 @@ func (self *Policy) sanitize(r io.Reader, w io.Writer) error {
 
 	tokenizer := newTokenizer(r)
 	for {
-		if ok, err := checkTokenizerErr(tokenizer); err != nil || !ok {
+		t, err := nextToken(tokenizer)
+		if err != nil || t == nil {
 			return err
 		}
 
-		t := tokenizer.Token()
 		switch t.Type {
 		case html.DoctypeToken:
 
@@ -160,7 +160,7 @@ func (self *Policy) sanitize(r io.Reader, w io.Writer) error {
 			if hidden > 0 {
 				hidden++
 				continue
-			} else if t.Contains("hidden") {
+			} else if t.Hidden() {
 				hidden++
 				skipElementContent = true
 				if err := self.maybeAddSpaces(buff); err != nil {
@@ -175,7 +175,7 @@ func (self *Policy) sanitize(r io.Reader, w io.Writer) error {
 			}
 
 			el := self.policies(t.Data)
-			if el == nil {
+			if el == nil && !self.open {
 				if _, ok := self.skipContent[t.Data]; ok {
 					hidden++
 					skipElementContent = true
@@ -238,7 +238,7 @@ func (self *Policy) sanitize(r io.Reader, w io.Writer) error {
 				break
 			}
 
-			if !self.hasPolicies(t.Data) {
+			if !self.allowedElement(t.Data) {
 				if err := self.maybeAddSpaces(buff); err != nil {
 					return err
 				}
@@ -267,7 +267,7 @@ func (self *Policy) sanitize(r io.Reader, w io.Writer) error {
 			}
 
 			el := self.policies(t.Data)
-			if el == nil {
+			if el == nil && !self.open {
 				if err := self.maybeAddSpaces(buff); err != nil {
 					return err
 				}
@@ -298,19 +298,18 @@ func (self *Policy) sanitize(r io.Reader, w io.Writer) error {
 	}
 }
 
-func checkTokenizerErr(t *tokenizer) (bool, error) {
+func nextToken(t *tokenizer) (*token, error) {
 	if t.Next() != html.ErrorToken {
-		return true, nil
+		return t.Token(), nil
 	}
 
 	err := t.Err()
 	if errors.Is(err, io.EOF) {
 		// End of input means end of processing
-		return false, nil
+		return nil, nil
 	}
-
 	// Raw tokenizer error
-	return false, fmt.Errorf(genericErrMsg, err)
+	return nil, fmt.Errorf(genericErrMsg, err)
 }
 
 func (self *Policy) commentToken(t *token, w io.StringWriter) error {
@@ -340,9 +339,7 @@ func (self *Policy) maybeAddSpaces(buff io.StringWriter) error {
 func (self *Policy) safeAtom(a atom.Atom) bool {
 	switch a {
 	case atom.Script, atom.Style:
-		if !self.unsafe {
-			return false
-		}
+		return self.unsafe
 	}
 	return true
 }
@@ -358,17 +355,7 @@ func (self *Policy) sanitizeAttrs(t *token, el *element) {
 
 	// Builds a new attribute slice based on the whether the attribute has been
 	// allowed explicitly or globally.
-	for _, attr := range attrs {
-		switch {
-		// If we see a data attribute, let it through.
-		case self.matchDataAttribute(t, attr):
-		// Is this a "style" attribute, and if so, do we need to sanitize it?
-		case self.matchStylePolicy(t, attr):
-		default:
-			// Is there a policy that applies?
-			self.matchPolicy(t, attr, el)
-		}
-	}
+	self.appendAttrs(t, attrs, el)
 
 	if attrs, ok := self.setAttrs[t.Data]; ok {
 		t.SetAttrs(attrs)
@@ -403,6 +390,27 @@ func (self *Policy) modifyTokenAttr(t *token) []html.Attribute {
 		t.Attr = self.callbackAttr(&t.Token)
 	}
 	return t.Reset()
+}
+
+// appendAttrs builds a new attribute slice based on the whether the attribute
+// has been allowed explicitly or globally.
+func (self *Policy) appendAttrs(t *token, attrs []html.Attribute, el *element) {
+	if self.open {
+		t.Append(attrs...)
+		return
+	}
+
+	for _, attr := range attrs {
+		switch {
+		// If we see a data attribute, let it through.
+		case self.matchDataAttribute(t, attr):
+		// Is this a "style" attribute, and if so, do we need to sanitize it?
+		case self.matchStylePolicy(t, attr):
+		default:
+			// Is there a policy that applies?
+			self.matchPolicy(t, attr, el)
+		}
+	}
 }
 
 func (self *Policy) matchDataAttribute(t *token, attr html.Attribute) bool {
@@ -523,7 +531,7 @@ func (self *Policy) validateURLs(t *token) (href *url.URL) {
 
 	case atom.Iframe:
 		if src := self.deleteInvalidURL(t, "src", self.rewriteSrc); src == nil {
-			t.Reset()
+			t.Skip()
 			return nil
 		}
 
@@ -531,7 +539,7 @@ func (self *Policy) validateURLs(t *token) (href *url.URL) {
 		src := self.deleteInvalidURL(t, "src", self.rewriteSrc)
 		srcsetOk := self.sanitizeSrcSet(t)
 		if src == nil && !srcsetOk {
-			t.Reset()
+			t.Skip()
 			return nil
 		}
 
@@ -595,26 +603,36 @@ func (self *Policy) validURL(t *token, rawurl string) *url.URL {
 		return nil
 	}
 
-	urlPolicies, ok := self.urlSchemes[u.Scheme]
-	if !ok {
-		for _, r := range self.urlSchemeRegexps {
-			if r.MatchString(u.Scheme) {
-				return self.rewriteURL(t, u)
-			}
-		}
-		return nil
-	}
-
-	if len(urlPolicies) == 0 {
+	if self.matchScheme(u) {
 		return self.rewriteURL(t, u)
 	}
+	return nil
+}
 
-	for _, urlPolicy := range urlPolicies {
-		if urlPolicy(u) {
-			return self.rewriteURL(t, u)
+func (self *Policy) matchScheme(u *url.URL) bool {
+	if self.open {
+		return true
+	}
+
+	if policies, ok := self.urlSchemes[u.Scheme]; ok {
+		if len(policies) == 0 {
+			return true
+		}
+
+		for _, fn := range policies {
+			if fn(u) {
+				return true
+			}
+		}
+		return false
+	}
+
+	for _, r := range self.urlSchemeRegexps {
+		if r.MatchString(u.Scheme) {
+			return true
 		}
 	}
-	return nil
+	return false
 }
 
 func (self *Policy) rewriteURL(t *token, u *url.URL) *url.URL {
@@ -789,7 +807,11 @@ func (self *Policy) setRelAttr(t *token, nofollow, noreferrer, noopener bool) {
 }
 
 func (self *Policy) skipToken(t *token) bool {
-	if len(t.Attr) != 0 {
+	if t.Skipped() {
+		return true
+	}
+
+	if len(t.Attr) != 0 || self.open {
 		return false
 	}
 

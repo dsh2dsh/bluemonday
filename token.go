@@ -10,9 +10,14 @@ import (
 type token struct {
 	html.Token
 
-	index map[string]int
-	u     *url.URL
+	hidden bool
+	index  map[string]int
+	u      *url.URL
+	skip   bool
 }
+
+func (self *token) Hide()        { self.hidden = true }
+func (self *token) Hidden() bool { return self.hidden }
 
 func (self *token) Append(attrs ...html.Attribute) *html.Attribute {
 	i := len(self.Attr)
@@ -24,10 +29,10 @@ func (self *token) Append(attrs ...html.Attribute) *html.Attribute {
 	return &self.Attr[len(self.Attr)-1]
 }
 
-func (self *token) Contains(key string) bool {
-	return slices.ContainsFunc(self.Attr, func(a html.Attribute) bool {
-		return a.Key == key
-	})
+func (self *token) MakeIndex() {
+	for i, attr := range self.Attr {
+		self.index[attr.Key] = i
+	}
 }
 
 func (self *token) Delete(key string) {
@@ -58,7 +63,9 @@ func (self *token) Reset() []html.Attribute {
 	attrs := self.Attr
 	self.Attr = self.Attr[:0]
 	clear(self.index)
+	self.hidden = false
 	self.u = nil
+	self.skip = false
 	return attrs
 }
 
@@ -103,3 +110,6 @@ func (self *token) SetAttrs(attrs []html.Attribute) {
 
 func (self *token) SetURL(u *url.URL) { self.u = u }
 func (self *token) URL() *url.URL     { return self.u }
+
+func (self *token) Skip()         { self.skip = true }
+func (self *token) Skipped() bool { return self.skip }

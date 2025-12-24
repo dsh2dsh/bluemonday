@@ -78,7 +78,11 @@ func (self *Policy) policies(name string) (el *element) {
 	return el
 }
 
-func (self *Policy) hasPolicies(name string) bool {
+func (self *Policy) allowedElement(name string) bool {
+	if self.open {
+		return true
+	}
+
 	if _, ok := self.elements[name]; ok {
 		return true
 	}

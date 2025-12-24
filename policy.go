@@ -169,6 +169,8 @@ type Policy struct {
 	setAttrsIf map[string][]*setAttrPolicy
 
 	styleHandler func(tag, style string) string
+
+	open bool // pass all elements and attributes as is
 }
 
 type attrPolicy struct {

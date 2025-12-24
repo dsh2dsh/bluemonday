@@ -40,8 +40,12 @@ func (self *tokenizer) Token() *token {
 		for moreAttr {
 			var key, val []byte
 			key, val, moreAttr = self.TagAttr()
+			keyStr := atom.String(key)
+			if keyStr == "hidden" {
+				t.Hide()
+			}
 			t.Attr = append(t.Attr,
-				html.Attribute{Key: atom.String(key), Val: string(val)})
+				html.Attribute{Key: keyStr, Val: string(val)})
 		}
 		if a := atom.Lookup(name); a != 0 {
 			t.DataAtom, t.Data = a, a.String()

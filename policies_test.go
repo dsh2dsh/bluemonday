@@ -29,7 +29,15 @@
 
 package bluemonday
 
-import "testing"
+import (
+	"net/url"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"golang.org/x/net/html"
+	"golang.org/x/net/html/atom"
+)
 
 func TestStrictPolicy(t *testing.T) {
 	p := StrictPolicy()
@@ -188,5 +196,60 @@ func TestUGCPolicy(t *testing.T) {
 				test.expected,
 			)
 		}
+	}
+}
+
+func TestOpenPolicy(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "attributes",
+			input:    `<div a="b" b="c" data-a="b">foo bar</div>`,
+			expected: `<div a="b" b="c" data-a="b">foo bar</div>`,
+		},
+		{
+			name:     "proxy image",
+			input:    `<img src="http://example.org/img.jpg">foo bar</img>`,
+			expected: `<img src="http://localhost/proxy?u=http%3A%2F%2Fexample.org%2Fimg.jpg">foo bar</img>`,
+		},
+		{
+			name:     "href",
+			input:    `<a href="https://example.org">foo bar</a>`,
+			expected: `<a href="https://example.org">foo bar</a>`,
+		},
+		{
+			name:     "invalid href",
+			input:    `<a href="://example.org">foo bar</a>`,
+			expected: `<a>foo bar</a>`,
+		},
+		{
+			name:     "invalid img src",
+			input:    `<img src="://example.org/img.jpg">foo bar</img>`,
+			expected: `foo bar`,
+		},
+	}
+
+	proxyURL, err := url.Parse("http://localhost/proxy")
+	require.NoError(t, err)
+
+	p := OpenPolicy().RewriteTokenURL(func(t *html.Token, u *url.URL) *url.URL {
+		if t.DataAtom == atom.Img {
+			u2 := *proxyURL
+			values := u2.Query()
+			values.Set("u", u.String())
+			u2.RawQuery = values.Encode()
+			return &u2
+		}
+		return u
+	})
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := p.Sanitize(tt.input)
+			assert.Equal(t, tt.expected, got)
+		})
 	}
 }

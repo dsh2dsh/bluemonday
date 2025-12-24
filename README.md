@@ -129,6 +129,16 @@ This project is a fork of bluemonday. Changes from
   or `https://youtube-nocookie.com` and so on, where domain name is
   `youtube.com` or `youtube-nocookie.com`.
 
+* New policy `OpenPolicy`
+
+  `OpenPolicy` returns a policy, which pass almost all HTML elements and their
+  attributes as is. It validates and strips invalid URLs by default and calls
+  callbacks. Such policy can be used to just modify (proxyfy) URLs and pass
+  everything else as is, expecting the document is already sanitized or is from
+  trusted source.
+
+  Don't use this policy, unless you sure the input document is safe!
+
 ---
 
 bluemonday is a HTML sanitizer implemented in Go. It is fast and highly configurable.
