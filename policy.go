@@ -185,15 +185,14 @@ type attrPolicy struct {
 func (self *attrPolicy) Match(value string) bool {
 	matched := true
 	if self.single != "" {
-		if strings.ToLower(value) == self.single {
+		if strings.EqualFold(self.single, value) {
 			return true
 		}
 		matched = false
 	}
 
 	if self.values != nil {
-		v := strings.ToLower(value)
-		if _, ok := self.values[v]; ok {
+		if _, ok := self.values[strings.ToLower(value)]; ok {
 			return true
 		}
 		matched = false

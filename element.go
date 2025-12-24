@@ -126,6 +126,8 @@ func (self *element) Match(attr html.Attribute) bool {
 	policies, ok := self.attrs[attr.Key]
 	if !ok {
 		return false
+	} else if len(policies) == 0 {
+		return false
 	}
 
 	for _, ap := range policies {
