@@ -133,7 +133,7 @@ This project is a fork of bluemonday. Changes from
 
   `OpenPolicy` returns a policy, which pass almost all HTML elements and their
   attributes as is. It validates and strips invalid URLs by default and calls
-  callbacks. Such policy can be used to just modify (proxyfy) URLs and pass
+  callbacks. Such policy can be used to just modify (proxify) URLs and pass
   everything else as is, expecting the document is already sanitized or is from
   trusted source.
 
