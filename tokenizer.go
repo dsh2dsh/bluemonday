@@ -2,6 +2,7 @@ package bluemonday
 
 import (
 	"io"
+	"unsafe"
 
 	"golang.org/x/net/html"
 	"golang.org/x/net/html/atom"
@@ -34,24 +35,39 @@ func (self *tokenizer) Token() *token {
 	t := &self.token
 	switch t.Type {
 	case html.TextToken, html.CommentToken, html.DoctypeToken:
-		t.Data = string(self.Text())
+		t.Data = unsafeBytesToString(self.Text())
+
 	case html.StartTagToken, html.SelfClosingTagToken, html.EndTagToken:
 		name, moreAttr := self.TagName()
+		t.DataAtom, t.Data = atomString(name)
+
 		for moreAttr {
 			var key, val []byte
 			key, val, moreAttr = self.TagAttr()
-			keyStr := atom.String(key)
-			if keyStr == "hidden" {
+			keyAtom, keyStr := atomString(key)
+			if keyAtom == atom.Hidden {
 				t.Hide()
 			}
 			t.Attr = append(t.Attr,
-				html.Attribute{Key: keyStr, Val: string(val)})
-		}
-		if a := atom.Lookup(name); a != 0 {
-			t.DataAtom, t.Data = a, a.String()
-		} else {
-			t.DataAtom, t.Data = 0, string(name)
+				html.Attribute{Key: keyStr, Val: unsafeBytesToString(val)})
 		}
 	}
 	return t
+}
+
+// This conversion *does not* copy data. Note that casting via
+// "(string)([]byte)" *does* copy data. Also note that you *should not* change
+// the byte slice after conversion, because Go strings are treated as immutable.
+// This would cause a segmentation violation panic.
+//
+// https://www.reddit.com/r/golang/comments/14xvgoj/converting_string_byte/
+func unsafeBytesToString(b []byte) string {
+	return unsafe.String(unsafe.SliceData(b), len(b))
+}
+
+func atomString(b []byte) (atom.Atom, string) {
+	if a := atom.Lookup(b); a != 0 {
+		return a, a.String()
+	}
+	return 0, unsafeBytesToString(b)
 }
