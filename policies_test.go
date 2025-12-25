@@ -31,6 +31,7 @@ package bluemonday
 
 import (
 	"net/url"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -176,7 +177,7 @@ func TestUGCPolicy(t *testing.T) {
 			in:       `xss<a href="http://www.google.de" style="color:red;" onmouseover=alert(1) onmousemove="alert(2)" onclick=alert(3)>g<img src="http://example.org"/>oogle</a>`,
 			expected: `xss<a href="http://www.google.de" rel="nofollow">g<img src="http://example.org"/>oogle</a>`,
 		},
-		// OWASP 25 June 2014 09:15 Strange behaviour
+		// 19: OWASP 25 June 2014 09:15 Strange behaviour
 		{
 			in:       "<table>Hallo\r\n<script>SCRIPT</script>\nEnde\n\r",
 			expected: "<table>Hallo\n\nEnde\n\n",
@@ -185,17 +186,10 @@ func TestUGCPolicy(t *testing.T) {
 
 	p := UGCPolicy()
 
-	for ii, test := range tests {
-		out := p.Sanitize(test.in)
-		if out != test.expected {
-			t.Errorf(
-				"test %d failed;\ninput   : %s\noutput  : %s\nexpected: %s",
-				ii,
-				test.in,
-				out,
-				test.expected,
-			)
-		}
+	for i, tt := range tests {
+		t.Run("test "+strconv.Itoa(i), func(t *testing.T) {
+			assert.Equal(t, tt.expected, p.Sanitize(tt.in))
+		})
 	}
 }
 

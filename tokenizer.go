@@ -17,15 +17,25 @@ type tokenizer struct {
 func newTokenizer(r io.Reader) *tokenizer {
 	return &tokenizer{
 		Tokenizer: html.NewTokenizer(r),
+
 		token: token{
 			Token: html.Token{Attr: []html.Attribute{}},
-			index: make(map[string]int),
+
+			hideDepth: -1,
+			index:     make(map[string]int),
 		},
 	}
 }
 
 func (self *tokenizer) Next() html.TokenType {
 	t := &self.token
+	switch t.Type {
+	case html.StartTagToken:
+		t.pushParent()
+	case html.EndTagToken:
+		t.popParent()
+	}
+
 	t.Type = self.Tokenizer.Next()
 	t.Reset()
 	return t.Type
@@ -46,7 +56,7 @@ func (self *tokenizer) Token() *token {
 			key, val, moreAttr = self.TagAttr()
 			keyAtom, keyStr := atomString(key)
 			if keyAtom == atom.Hidden {
-				t.Hide()
+				t.hide()
 			}
 			t.Attr = append(t.Attr,
 				html.Attribute{Key: keyStr, Val: unsafeBytesToString(val)})

@@ -125,12 +125,7 @@ func (self *Policy) sanitize(r io.Reader, w io.Writer) error {
 		buff = &stringWriter{w}
 	}
 
-	var (
-		hidden               int64
-		skipElementContent   bool
-		skipClosingTag       []string
-		recentlyStartedToken atom.Atom
-	)
+	var skipClosingTag []string
 
 	tokenizer := newTokenizer(r)
 	for {
@@ -157,28 +152,24 @@ func (self *Policy) sanitize(r io.Reader, w io.Writer) error {
 
 		case html.StartTagToken:
 
-			if hidden > 0 {
-				hidden++
-				continue
-			} else if t.Hidden() {
-				hidden++
-				skipElementContent = true
-				if err := self.maybeAddSpaces(buff); err != nil {
-					return err
+			if t.hidden() {
+				if t.topHidden() {
+					if err := self.maybeAddSpaces(buff); err != nil {
+						return err
+					}
 				}
 				continue
 			}
 
-			recentlyStartedToken = t.DataAtom
 			if !self.safeAtom(t.DataAtom) {
+				t.hide()
 				continue
 			}
 
 			el := self.policies(t.Data)
 			if el == nil && !self.open {
 				if _, ok := self.skipContent[t.Data]; ok {
-					hidden++
-					skipElementContent = true
+					t.hide()
 				}
 				if err := self.maybeAddSpaces(buff); err != nil {
 					return err
@@ -195,38 +186,14 @@ func (self *Policy) sanitize(r io.Reader, w io.Writer) error {
 				break
 			}
 
-			if skipElementContent {
-				continue
-			} else if _, err := buff.WriteString(t.String()); err != nil {
+			if _, err := buff.WriteString(t.String()); err != nil {
 				return fmt.Errorf(genericErrMsg, err)
 			}
-
-			switch t.DataAtom {
-			case atom.Script, atom.Style:
-			default:
-				if _, ok := self.skipContent[t.Data]; ok {
-					skipElementContent = true
-				}
-			}
+			self.hideSkippedContent(t)
 
 		case html.EndTagToken:
 
-			if hidden > 0 {
-				hidden--
-				if hidden == 0 {
-					skipElementContent = false
-					if err := self.maybeAddSpaces(buff); err != nil {
-						return err
-					}
-				}
-				continue
-			}
-
-			if recentlyStartedToken == t.DataAtom {
-				recentlyStartedToken = 0
-			}
-
-			if !self.safeAtom(t.DataAtom) {
+			if t.hidden() {
 				continue
 			}
 
@@ -235,34 +202,23 @@ func (self *Policy) sanitize(r io.Reader, w io.Writer) error {
 				if err := self.maybeAddSpaces(buff); err != nil {
 					return err
 				}
-				break
+				continue
 			}
 
 			if !self.allowedElement(t.Data) {
 				if err := self.maybeAddSpaces(buff); err != nil {
 					return err
 				}
-				break
+				continue
 			}
 
-			switch t.DataAtom {
-			case atom.Script, atom.Style:
-			default:
-				_, ok := self.skipContent[t.Data]
-				if skipElementContent && ok {
-					skipElementContent = false
-				}
-			}
-
-			if !skipElementContent {
-				if _, err := buff.WriteString(t.String()); err != nil {
-					return fmt.Errorf(genericErrMsg, err)
-				}
+			if _, err := buff.WriteString(t.String()); err != nil {
+				return fmt.Errorf(genericErrMsg, err)
 			}
 
 		case html.SelfClosingTagToken:
 
-			if hidden > 0 || !self.safeAtom(t.DataAtom) {
+			if t.hidden() || !self.safeAtom(t.DataAtom) {
 				continue
 			}
 
@@ -271,7 +227,7 @@ func (self *Policy) sanitize(r io.Reader, w io.Writer) error {
 				if err := self.maybeAddSpaces(buff); err != nil {
 					return err
 				}
-				break
+				continue
 			}
 
 			self.sanitizeAttrs(t, el)
@@ -279,19 +235,18 @@ func (self *Policy) sanitize(r io.Reader, w io.Writer) error {
 				if err := self.maybeAddSpaces(buff); err != nil {
 					return err
 				}
-				break
+				continue
 			}
 
-			if !skipElementContent {
-				if _, err := buff.WriteString(t.String()); err != nil {
-					return fmt.Errorf(genericErrMsg, err)
-				}
+			if _, err := buff.WriteString(t.String()); err != nil {
+				return fmt.Errorf(genericErrMsg, err)
 			}
 
 		case html.TextToken:
-			if skipElementContent {
+			if t.hidden() {
 				continue
-			} else if err := self.textToken(recentlyStartedToken, t, buff); err != nil {
+			}
+			if err := self.textToken(t, buff); err != nil {
 				return err
 			}
 		}
@@ -849,24 +804,38 @@ func (self *Policy) setCondAttrs(t *token) {
 	}
 }
 
-func (self *Policy) textToken(startToken atom.Atom, t *token, w io.StringWriter,
-) error {
-	switch startToken {
+func (self *Policy) hideSkippedContent(t *token) {
+	switch t.DataAtom {
+	case atom.Script, atom.Style:
+		if self.unsafe {
+			return
+		}
+	}
+
+	if _, ok := self.skipContent[t.Data]; ok {
+		t.hideInner()
+	}
+}
+
+func (self *Policy) textToken(t *token, w io.StringWriter) error {
+	switch t.ParentAtom() {
 	case atom.Script, atom.Style:
 		// not encouraged, but if a policy allows JavaScript or CSS styles we
 		// should not HTML escape it as that would break the output
 		//
 		// requires p.AllowUnsafe()
-		if self.unsafe {
-			if _, err := w.WriteString(t.Data); err != nil {
-				return fmt.Errorf(genericErrMsg, err)
-			}
+		if !self.unsafe {
+			return nil
 		}
-	default:
-		// HTML escape the text
-		if _, err := w.WriteString(t.String()); err != nil {
+		if _, err := w.WriteString(t.Data); err != nil {
 			return fmt.Errorf(genericErrMsg, err)
 		}
+		return nil
+	}
+
+	// HTML escape the text
+	if _, err := w.WriteString(t.String()); err != nil {
+		return fmt.Errorf(genericErrMsg, err)
 	}
 	return nil
 }

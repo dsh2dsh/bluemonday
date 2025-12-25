@@ -2204,38 +2204,11 @@ func TestIssue55(t *testing.T) {
 	p3 := UGCPolicy().AllowElements("script").AllowUnsafe(true)
 
 	in := `<SCRIPT>document.write('<h1><header/h1>')</SCRIPT>`
-	expected := ``
-	out := p1.Sanitize(in)
-	if out != expected {
-		t.Errorf(
-			"test failed;\ninput   : %s\noutput  : %s\nexpected: %s",
-			in,
-			out,
-			expected,
-		)
-	}
+	assert.Empty(t, p1.Sanitize(in))
+	assert.Empty(t, p2.Sanitize(in))
 
-	expected = ``
-	out = p2.Sanitize(in)
-	if out != expected {
-		t.Errorf(
-			"test failed;\ninput   : %s\noutput  : %s\nexpected: %s",
-			in,
-			out,
-			expected,
-		)
-	}
-
-	expected = `<script>document.write('<h1><header/h1>')</script>`
-	out = p3.Sanitize(in)
-	if out != expected {
-		t.Errorf(
-			"test failed;\ninput   : %s\noutput  : %s\nexpected: %s",
-			in,
-			out,
-			expected,
-		)
-	}
+	assert.Equal(t, `<script>document.write('<h1><header/h1>')</script>`,
+		p3.Sanitize(in))
 }
 
 func TestIssue85(t *testing.T) {
@@ -2860,7 +2833,7 @@ func TestHidden(t *testing.T) {
 	assert.Equal(t, expected, p.Sanitize(input))
 
 	p.AddSpaceWhenStrippingTag(true)
-	expected = `<p>Before paragraph.</p>  <p>After paragraph.</p>`
+	expected = `<p>Before paragraph.</p> <p>After paragraph.</p>`
 	assert.Equal(t, expected, p.Sanitize(input))
 }
 

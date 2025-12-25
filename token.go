@@ -5,19 +5,60 @@ import (
 	"slices"
 
 	"golang.org/x/net/html"
+	"golang.org/x/net/html/atom"
 )
 
 type token struct {
 	html.Token
 
-	hidden bool
-	index  map[string]int
-	u      *url.URL
-	skip   bool
+	parents   []atom.Atom
+	hideDepth int
+	skip      bool
+
+	index map[string]int
+	u     *url.URL
 }
 
-func (self *token) Hide()        { self.hidden = true }
-func (self *token) Hidden() bool { return self.hidden }
+func (self *token) pushParent() {
+	self.parents = append(self.parents, self.DataAtom)
+}
+
+func (self *token) popParent() {
+	if len(self.parents) == 0 {
+		return
+	}
+
+	last := len(self.parents) - 1
+	self.parents = self.parents[:last]
+
+	if self.topHidden() {
+		self.hideDepth = -1
+	}
+}
+
+func (self *token) hide()      { self.hideDepth = len(self.parents) }
+func (self *token) hideInner() { self.hideDepth = len(self.parents) + 1 }
+
+func (self *token) hidden() bool {
+	switch {
+	case self.hideDepth == -1:
+		return false
+	case self.Type == html.EndTagToken:
+		return len(self.parents) > self.hideDepth
+	}
+	return len(self.parents) >= self.hideDepth
+}
+
+func (self *token) topHidden() bool {
+	return len(self.parents) == self.hideDepth
+}
+
+func (self *token) ParentAtom() atom.Atom {
+	if len(self.parents) == 0 {
+		return 0
+	}
+	return self.parents[len(self.parents)-1]
+}
 
 func (self *token) Append(attrs ...html.Attribute) *html.Attribute {
 	i := len(self.Attr)
@@ -63,7 +104,6 @@ func (self *token) Reset() []html.Attribute {
 	attrs := self.Attr
 	self.Attr = self.Attr[:0]
 	clear(self.index)
-	self.hidden = false
 	self.u = nil
 	self.skip = false
 	return attrs
