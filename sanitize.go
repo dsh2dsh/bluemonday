@@ -125,8 +125,6 @@ func (self *Policy) sanitize(r io.Reader, w io.Writer) error {
 		buff = &stringWriter{w}
 	}
 
-	var skipClosingTag []string
-
 	tokenizer := newTokenizer(r)
 	for {
 		t, err := nextToken(tokenizer)
@@ -170,6 +168,8 @@ func (self *Policy) sanitize(r io.Reader, w io.Writer) error {
 			if el == nil && !self.open {
 				if _, ok := self.skipContent[t.Data]; ok {
 					t.hide()
+				} else {
+					tokenizer.SkipClosingTag()
 				}
 				if err := self.maybeAddSpaces(buff); err != nil {
 					return err
@@ -179,7 +179,7 @@ func (self *Policy) sanitize(r io.Reader, w io.Writer) error {
 
 			self.sanitizeAttrs(t, el)
 			if self.skipToken(t) {
-				skipClosingTag = append(skipClosingTag, t.Data)
+				tokenizer.SkipClosingTag()
 				if err := self.maybeAddSpaces(buff); err != nil {
 					return err
 				}
@@ -195,17 +195,7 @@ func (self *Policy) sanitize(r io.Reader, w io.Writer) error {
 
 			if t.hidden() {
 				continue
-			}
-
-			if len(skipClosingTag) != 0 && skipClosingTag[len(skipClosingTag)-1] == t.Data {
-				skipClosingTag = skipClosingTag[:len(skipClosingTag)-1]
-				if err := self.maybeAddSpaces(buff); err != nil {
-					return err
-				}
-				continue
-			}
-
-			if !self.allowedElement(t.Data) {
+			} else if tokenizer.Skipped() || !self.allowedElement(t.Data) {
 				if err := self.maybeAddSpaces(buff); err != nil {
 					return err
 				}

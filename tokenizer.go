@@ -12,6 +12,13 @@ type tokenizer struct {
 	*html.Tokenizer
 
 	token token
+
+	skipClosingTags []closingTag
+}
+
+type closingTag struct {
+	Atom  atom.Atom
+	Depth int
 }
 
 func newTokenizer(r io.Reader) *tokenizer {
@@ -34,11 +41,22 @@ func (self *tokenizer) Next() html.TokenType {
 		t.pushParent()
 	case html.EndTagToken:
 		t.popParent()
+		self.validateClosingTags()
 	}
 
 	t.Type = self.Tokenizer.Next()
 	t.Reset()
 	return t.Type
+}
+
+func (self *tokenizer) validateClosingTags() {
+	t := &self.token
+	for i := range self.skipClosingTags {
+		if self.skipClosingTags[i].Depth > t.depth() {
+			self.skipClosingTags = self.skipClosingTags[:i]
+			break
+		}
+	}
 }
 
 func (self *tokenizer) Token() *token {
@@ -80,4 +98,41 @@ func atomString(b []byte) (atom.Atom, string) {
 		return a, a.String()
 	}
 	return 0, unsafeBytesToString(b)
+}
+
+func (self *tokenizer) SkipClosingTag() {
+	t := &self.token
+	if t.Type != html.StartTagToken {
+		return
+	}
+	self.skipClosingTags = append(self.skipClosingTags, closingTag{
+		Atom:  t.DataAtom,
+		Depth: t.depth() + 1,
+	})
+}
+
+func (self *tokenizer) Skipped() bool {
+	t := &self.token
+	switch {
+	case t.Type != html.EndTagToken:
+		return false
+	case !t.hasParent():
+		return true
+	case len(self.skipClosingTags) == 0:
+		return false
+	}
+
+	last := len(self.skipClosingTags) - 1
+	if t.depth() > self.skipClosingTags[last].Depth {
+		return false
+	}
+
+	for ; last >= 0; last-- {
+		skip := &self.skipClosingTags[last]
+		if skip.Atom == t.DataAtom {
+			self.skipClosingTags = self.skipClosingTags[:last]
+			return true
+		}
+	}
+	return false
 }

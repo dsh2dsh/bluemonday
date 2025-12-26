@@ -37,6 +37,7 @@ import (
 	"net/url"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -975,7 +976,7 @@ echo('IPT>alert("XSS")</SCRIPT>'); ?>`,
 			in:       `<!--#exec cmd="/bin/echo '<SCR'"--><!--#exec cmd="/bin/echo 'IPT SRC=http://ha.ckers.org/xss.js></SCRIPT>'"-->`,
 			expected: ``,
 		},
-		{
+		{ // test 13
 			in: `<HTML><BODY>
 <?xml:namespace prefix="t" ns="urn:schemas-microsoft-com:time">
 <?import namespace="t" implementation="#default#time2">
@@ -989,7 +990,7 @@ echo('IPT>alert("XSS")</SCRIPT>'); ?>`,
 			expected: `
 <span></span>`,
 		},
-		{
+		{ // test 15
 			in: `<XML ID="xss"><I><B><IMG SRC="javas<!-- -->cript:alert('XSS')"></B></I></XML>
 <SPAN DATASRC="#xss" DATAFLD="B" DATAFORMATAS="HTML"></SPAN>`,
 			expected: `<i><b></b></i>
@@ -1119,9 +1120,9 @@ echo('IPT>alert("XSS")</SCRIPT>'); ?>`,
 			in:       `<BODY ONLOAD=alert('XSS')>`,
 			expected: ``,
 		},
-		{
+		{ // test 47
 			in:       `<STYLE>li {list-style-image: url("javascript:alert('XSS')");}</STYLE><UL><LI>XSS</br>`,
-			expected: `<ul><li>XSS</br>`,
+			expected: `<ul><li>XSS`,
 		},
 		{
 			in:       `<IMG LOWSRC="javascript:alert('XSS')">`,
@@ -1139,7 +1140,7 @@ echo('IPT>alert("XSS")</SCRIPT>'); ?>`,
 			in:       `<INPUT TYPE="IMAGE" SRC="javascript:alert('XSS');">`,
 			expected: ``,
 		},
-		{
+		{ // test 52
 			in:       `</TITLE><SCRIPT>alert("XSS");</SCRIPT>`,
 			expected: ``,
 		},
@@ -1257,24 +1258,12 @@ echo('IPT>alert("XSS")</SCRIPT>'); ?>`,
 
 	// These tests are run concurrently to enable the race detector to pick up
 	// potential issues
-	wg := sync.WaitGroup{}
-	wg.Add(len(tests))
-	for ii, tt := range tests {
-		go func(ii int, tt test) {
-			out := p.Sanitize(tt.in)
-			if out != tt.expected {
-				t.Errorf(
-					"test %d failed;\ninput   : %s\noutput  : %s\nexpected: %s",
-					ii,
-					tt.in,
-					out,
-					tt.expected,
-				)
-			}
-			wg.Done()
-		}(ii, tt)
+	for i, tt := range tests {
+		t.Run("test "+strconv.Itoa(i), func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.expected, p.Sanitize(tt.in))
+		})
 	}
-	wg.Wait()
 }
 
 func TestAllowNoAttrs(t *testing.T) {
@@ -1343,21 +1332,12 @@ func TestSkipElementsContent(t *testing.T) {
 }
 
 func TestTagSkipClosingTagNested(t *testing.T) {
-	input := "<tag1><tag2><tag3>text</tag3></tag2></tag1>"
-	outputOk := "<tag2>text</tag2>"
-
 	p := NewPolicy()
 	p.AllowElements("tag1", "tag3")
 	p.AllowNoAttrs().OnElements("tag2")
 
-	if output := p.Sanitize(input); output != outputOk {
-		t.Errorf(
-			"test failed;\ninput   : %s\noutput  : %s\nexpected: %s",
-			input,
-			output,
-			outputOk,
-		)
-	}
+	input := "<tag1><tag2><tag3>text</tag3></tag2></tag1>"
+	assert.Equal(t, `<tag2>text</tag2>`, p.Sanitize(input))
 }
 
 func TestAddSpaces(t *testing.T) {
@@ -1921,7 +1901,7 @@ func TestIssue3(t *testing.T) {
 			in:       `Hello <span class="javascript:alert(123)">there</span> world.`,
 			expected: `Hello <span>there</span> world.`,
 		},
-		{
+		{ // test 2
 			in:       `Hello <span class="><script src="http://hackers.org/XSS.js"></script>">there</span> world.`,
 			expected: `Hello <span>&#34;&gt;there</span> world.`,
 		},
@@ -1931,24 +1911,12 @@ func TestIssue3(t *testing.T) {
 		},
 	}
 
-	wg := sync.WaitGroup{}
-	wg.Add(len(tests))
-	for ii, tt := range tests {
-		go func(ii int, tt test) {
-			out := p.Sanitize(tt.in)
-			if out != tt.expected {
-				t.Errorf(
-					"test %d failed;\ninput   : %s\noutput  : %s\nexpected: %s",
-					ii,
-					tt.in,
-					out,
-					tt.expected,
-				)
-			}
-			wg.Done()
-		}(ii, tt)
+	for i, tt := range tests {
+		t.Run("test "+strconv.Itoa(i), func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.expected, p.Sanitize(tt.in))
+		})
 	}
-	wg.Wait()
 }
 
 func TestIssue9(t *testing.T) {
@@ -2960,4 +2928,12 @@ func BenchmarkOpenPolicy(b *testing.B) {
 			p.SanitizeReaderToWriter(&r, io.Discard)
 		}
 	}
+}
+
+func TestSkipClosingTag(t *testing.T) {
+	p := NewPolicy()
+	p.AllowAttrs("foo").OnElements("tag")
+
+	input := `<tag>foo<tag foo="bar">bar</tag>baz</tag>`
+	assert.Equal(t, `foo<tag foo="bar">bar</tag>baz`, p.Sanitize(input))
 }

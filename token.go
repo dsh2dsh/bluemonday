@@ -29,12 +29,19 @@ func (self *token) popParent() {
 	}
 
 	last := len(self.parents) - 1
-	self.parents = self.parents[:last]
+	for ; last >= 0; last-- {
+		if self.parents[last] == self.DataAtom {
+			self.parents = self.parents[:last]
+			break
+		}
+	}
 
 	if self.topHidden() {
 		self.hideDepth = -1
 	}
 }
+
+func (self *token) depth() int { return len(self.parents) }
 
 func (self *token) hide()      { self.hideDepth = len(self.parents) }
 func (self *token) hideInner() { self.hideDepth = len(self.parents) + 1 }
@@ -51,6 +58,10 @@ func (self *token) hidden() bool {
 
 func (self *token) topHidden() bool {
 	return len(self.parents) == self.hideDepth
+}
+
+func (self *token) hasParent() bool {
+	return slices.Index(self.parents, self.DataAtom) != -1
 }
 
 func (self *token) ParentAtom() atom.Atom {
