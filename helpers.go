@@ -229,6 +229,7 @@ var (
 		"object",
 		"script",
 		"style",
+		"svg",
 		"title",
 	}
 )
