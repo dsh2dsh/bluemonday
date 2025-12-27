@@ -8,6 +8,30 @@ import (
 	"golang.org/x/net/html/atom"
 )
 
+// Section 12.1.2, "Elements", gives this list of void elements. Void elements
+// are those that can't have any contents.
+//
+// Copied from golang.org/x/net/html/render.go
+//
+// See also https://developer.mozilla.org/en-US/docs/Glossary/Void_element
+var voidElements = map[atom.Atom]struct{}{
+	atom.Area:   {},
+	atom.Base:   {},
+	atom.Br:     {},
+	atom.Col:    {},
+	atom.Embed:  {},
+	atom.Hr:     {},
+	atom.Img:    {},
+	atom.Input:  {},
+	atom.Keygen: {}, // "keygen" has been removed from the spec, but are kept here for backwards compatibility.
+	atom.Link:   {},
+	atom.Meta:   {},
+	atom.Param:  {},
+	atom.Source: {},
+	atom.Track:  {},
+	atom.Wbr:    {},
+}
+
 type token struct {
 	html.Token
 
@@ -61,7 +85,27 @@ func (self *token) topHidden() bool {
 }
 
 func (self *token) hasParent() bool {
-	return slices.Index(self.parents, self.DataAtom) != -1
+	for i := len(self.parents) - 1; i >= 0; i-- {
+		if self.DataAtom == self.parents[i] {
+			return true
+		}
+	}
+	return false
+}
+
+func (self *token) withComputedType() *token {
+	if self.Type == html.StartTagToken && self.voidElement() {
+		self.Type = html.SelfClosingTagToken
+	}
+	return self
+}
+
+func (self *token) voidElement() bool {
+	if self.DataAtom == 0 {
+		return false
+	}
+	_, ok := voidElements[self.DataAtom]
+	return ok
 }
 
 func (self *token) ParentAtom() atom.Atom {

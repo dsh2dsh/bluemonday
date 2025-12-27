@@ -92,17 +92,17 @@ func TestUGCPolicy(t *testing.T) {
 			in:       `<a href="javascript:alert(1337)">foo</a>`,
 			expected: `foo`,
 		},
-		{
+		{ // test 5
 			in:       `<img src="http://example.org/foo.gif">`,
-			expected: `<img src="http://example.org/foo.gif">`,
+			expected: `<img src="http://example.org/foo.gif"/>`,
 		},
-		{
+		{ // test 6
 			in:       `<img src="http://example.org/x.gif" alt="y" width=96 height=64 border=0>`,
-			expected: `<img src="http://example.org/x.gif" alt="y" width="96" height="64">`,
+			expected: `<img src="http://example.org/x.gif" alt="y" width="96" height="64"/>`,
 		},
-		{
+		{ // test 7
 			in:       `<img src="http://example.org/x.png" alt="y" width="widgy" height=64 border=0>`,
-			expected: `<img src="http://example.org/x.png" alt="y" height="64">`,
+			expected: `<img src="http://example.org/x.png" alt="y" height="64"/>`,
 		},
 		// Anchors
 		{
@@ -138,9 +138,9 @@ func TestUGCPolicy(t *testing.T) {
 			expected: `<a id="header">Header text</a>`,
 		},
 		// Image map and links
-		{
+		{ // test 16
 			in:       `<img src="planets.gif" width="145" height="126" alt="" usemap="#demomap"><map name="demomap"><area shape="rect" coords="0,0,82,126" href="demo.htm" alt="1"><area shape="circle" coords="90,58,3" href="demo.htm" alt="2"><area shape="circle" coords="124,58,8" href="demo.htm" alt="3"></map>`,
-			expected: `<img src="planets.gif" width="145" height="126" alt="" usemap="#demomap"><map name="demomap"><area shape="rect" coords="0,0,82,126" href="demo.htm" alt="1" rel="nofollow"><area shape="circle" coords="90,58,3" href="demo.htm" alt="2" rel="nofollow"><area shape="circle" coords="124,58,8" href="demo.htm" alt="3" rel="nofollow"></map>`,
+			expected: `<img src="planets.gif" width="145" height="126" alt="" usemap="#demomap"/><map name="demomap"><area shape="rect" coords="0,0,82,126" href="demo.htm" alt="1" rel="nofollow"/><area shape="circle" coords="90,58,3" href="demo.htm" alt="2" rel="nofollow"/><area shape="circle" coords="124,58,8" href="demo.htm" alt="3" rel="nofollow"/></map>`,
 		},
 		// Tables
 		{
@@ -207,7 +207,7 @@ func TestOpenPolicy(t *testing.T) {
 		{
 			name:     "proxy image",
 			input:    `<img src="http://example.org/img.jpg">foo bar</img>`,
-			expected: `<img src="http://localhost/proxy?u=http%3A%2F%2Fexample.org%2Fimg.jpg">foo bar</img>`,
+			expected: `<img src="http://localhost/proxy?u=http%3A%2F%2Fexample.org%2Fimg.jpg"/>foo bar`,
 		},
 		{
 			name:     "href",

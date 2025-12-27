@@ -44,8 +44,8 @@ func (self *tokenizer) Next() html.TokenType {
 		self.validateClosingTags()
 	}
 
-	t.Type = self.Tokenizer.Next()
 	t.Reset()
+	t.Type = self.Tokenizer.Next()
 	return t.Type
 }
 
@@ -79,6 +79,7 @@ func (self *tokenizer) Token() *token {
 			t.Attr = append(t.Attr,
 				html.Attribute{Key: keyStr, Val: unsafeBytesToString(val)})
 		}
+		t.withComputedType()
 	}
 	return t
 }
@@ -116,7 +117,7 @@ func (self *tokenizer) Skipped() bool {
 	switch {
 	case t.Type != html.EndTagToken:
 		return false
-	case !t.hasParent():
+	case t.voidElement() || !t.hasParent():
 		return true
 	case len(self.skipClosingTags) == 0:
 		return false
