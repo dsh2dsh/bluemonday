@@ -61,7 +61,7 @@ func parseImageCandidate(input string, urlParser func(string) *url.URL,
 func validWidthDensity(value string) bool {
 	if value == "" {
 		return true
-	} else if i := strings.Index(value, " "); i >= 0 {
+	} else if strings.Contains(value, " ") {
 		return false
 	}
 
