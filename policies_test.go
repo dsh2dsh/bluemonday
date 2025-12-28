@@ -228,16 +228,17 @@ func TestOpenPolicy(t *testing.T) {
 	proxyURL, err := url.Parse("http://localhost/proxy")
 	require.NoError(t, err)
 
-	p := OpenPolicy().WithRewriteURL(func(t *Token, u *url.URL) *url.URL {
-		if t.DataAtom == atom.Img {
-			u2 := *proxyURL
-			values := u2.Query()
-			values.Set("u", u.String())
-			u2.RawQuery = values.Encode()
-			return &u2
-		}
-		return u
-	})
+	p := OpenPolicy().WithRewriteURL(
+		func(t *Token, attr string, u *url.URL) *url.URL {
+			if t.DataAtom == atom.Img {
+				u2 := *proxyURL
+				values := u2.Query()
+				values.Set("u", u.String())
+				u2.RawQuery = values.Encode()
+				return &u2
+			}
+			return u
+		})
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

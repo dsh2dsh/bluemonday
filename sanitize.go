@@ -505,7 +505,7 @@ func (self *Policy) deleteInvalidURL(t *Token, name string,
 		return nil
 	}
 
-	u := self.validURL(t, attr.Val)
+	u := self.validURL(t, attr)
 	if u == nil {
 		t.Delete(name)
 		return nil
@@ -523,9 +523,9 @@ func (self *Policy) deleteInvalidURL(t *Token, name string,
 	return u
 }
 
-func (self *Policy) validURL(t *Token, rawurl string) *url.URL {
+func (self *Policy) validURL(t *Token, attr *html.Attribute) *url.URL {
 	// URLs are valid if when space is trimmed the URL is valid
-	rawurl = strings.TrimSpace(rawurl)
+	rawurl := strings.TrimSpace(attr.Val)
 
 	// URLs cannot contain whitespace, unless it is a data-uri
 	if strings.HasPrefix(rawurl, `data:`) {
@@ -545,13 +545,13 @@ func (self *Policy) validURL(t *Token, rawurl string) *url.URL {
 
 	if !u.IsAbs() {
 		if self.relativeURLs && rawurl != "" {
-			return self.rewriteURL(t, u)
+			return self.rewriteURL(t, attr, u)
 		}
 		return nil
 	}
 
 	if self.matchScheme(u) {
-		return self.rewriteURL(t, u)
+		return self.rewriteURL(t, attr, u)
 	}
 	return nil
 }
@@ -582,13 +582,14 @@ func (self *Policy) matchScheme(u *url.URL) bool {
 	return false
 }
 
-func (self *Policy) rewriteURL(t *Token, u *url.URL) *url.URL {
+func (self *Policy) rewriteURL(t *Token, attr *html.Attribute, u *url.URL,
+) *url.URL {
 	if u == nil {
 		return nil
 	}
 
 	if self.urlRewriter != nil {
-		return self.urlRewriter(t, u)
+		return self.urlRewriter(t, attr.Key, u)
 	}
 
 	if *u == emptyURL {
@@ -619,7 +620,7 @@ func (self *Policy) sanitizeSrcSet(t *Token) bool {
 		return false
 	}
 
-	images := self.parseSrcSetAttribute(t, attr.Val)
+	images := self.parseSrcSetAttribute(t, attr)
 	if len(images) == 0 {
 		t.Delete(srcset)
 		return false
@@ -629,16 +630,18 @@ func (self *Policy) sanitizeSrcSet(t *Token) bool {
 	return true
 }
 
-func (self *Policy) parseSrcSetAttribute(t *Token, attr string,
+func (self *Policy) parseSrcSetAttribute(t *Token, attr *html.Attribute,
 ) ImageCandidates {
 	urlParser := func(s string) *url.URL {
-		if u := self.rewriteSrc(self.validURL(t, s)); u != nil {
+		a := *attr
+		a.Val = s
+		if u := self.rewriteSrc(self.validURL(t, &a)); u != nil {
 			t.setURL(u)
 			return u
 		}
 		return nil
 	}
-	return parseSrcSetAttribute(attr, urlParser)
+	return parseSrcSetAttribute(attr.Val, urlParser)
 }
 
 func (self *Policy) requireRelTargetBlank() bool {

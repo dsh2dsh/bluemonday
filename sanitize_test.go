@@ -2718,30 +2718,42 @@ func TestRewriteURL(t *testing.T) {
 		name     string
 		in       string
 		expected string
+		dataAtom atom.Atom
+		attr     string
 	}{
 		{
 			name:     "abs",
 			in:       `<a href="http://www.google.com">`,
 			expected: `<a href="http://www.google.com" target="_blank" rel="nofollow noreferrer noopener">`,
+			dataAtom: atom.A,
+			attr:     atom.Href.String(),
 		},
 		{
 			name:     "rel",
 			in:       `<a href="/page2.html">`,
 			expected: `<a href="https://example.com/page2.html" target="_blank" rel="nofollow noreferrer noopener">`,
+			dataAtom: atom.A,
+			attr:     atom.Href.String(),
 		},
 		{
 			name:     "video poster",
 			in:       `<video poster="giraffe.gif" />`,
 			expected: `<video poster="https://example.com/giraffe.gif"/>`,
+			dataAtom: atom.Video,
+			attr:     atom.Poster.String(),
 		},
 		{
 			name:     "video poster removed",
 			in:       `<video poster="removeme.gif" />`,
 			expected: `<video/>`,
+			dataAtom: atom.Video,
+			attr:     atom.Poster.String(),
 		},
 		{
-			name: "img removed",
-			in:   `<img src="removeme.gif" />`,
+			name:     "img removed",
+			in:       `<img src="removeme.gif" />`,
+			dataAtom: atom.Img,
+			attr:     atom.Src.String(),
 		},
 	}
 
@@ -2754,10 +2766,17 @@ func TestRewriteURL(t *testing.T) {
 
 	p.AllowAttrs("poster").OnElements("video")
 
-	p.WithRewriteURL(func(_ *Token, u *url.URL) *url.URL {
+	var gotAtom atom.Atom
+	var gotAttr string
+
+	p.WithRewriteURL(func(t *Token, attr string, u *url.URL) *url.URL {
+		gotAtom = t.DataAtom
+		gotAttr = attr
+
 		if u.IsAbs() {
 			return u
 		}
+
 		if u.EscapedPath() == "removeme.gif" {
 			return nil
 		}
@@ -2767,6 +2786,9 @@ func TestRewriteURL(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			assert.Equal(t, tt.expected, p.Sanitize(tt.in))
+			assert.Equal(t, tt.dataAtom, gotAtom, "want %q, got %q",
+				tt.dataAtom.String(), gotAtom.String())
+			assert.Equal(t, tt.attr, gotAttr)
 		})
 	}
 }
@@ -2885,7 +2907,7 @@ func TestSrcSet(t *testing.T) {
 	p.AllowElements("picture")
 	p.AllowAttrs("src", "srcset").OnElements("source")
 
-	p.WithRewriteURL(func(_ *Token, u *url.URL) *url.URL {
+	p.WithRewriteURL(func(_ *Token, _ string, u *url.URL) *url.URL {
 		if u.IsAbs() {
 			return u
 		}

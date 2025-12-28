@@ -163,7 +163,7 @@ type Policy struct {
 	// If urlRewriter is not nil, it is used to rewrite any attribute of tags that
 	// download resources, such as <a> or <img>. It requires that the URL is
 	// parsable by "net/url" url.Parse().
-	urlRewriter func(*Token, *url.URL) *url.URL
+	urlRewriter func(*Token, string, *url.URL) *url.URL
 
 	setAttrs   map[string][]html.Attribute
 	setAttrsIf map[string][]*setAttrPolicy
@@ -281,7 +281,9 @@ func (self *Policy) SetCallbackForAttributes(
 // If given function will return nil it means delete attribute which contains
 // this URL. In some cases, like for <a> or <iframe>, it means delete this
 // element.
-func (self *Policy) WithRewriteURL(fn func(*Token, *url.URL) *url.URL) *Policy {
+func (self *Policy) WithRewriteURL(
+	fn func(t *Token, attr string, u *url.URL) *url.URL,
+) *Policy {
 	self.urlRewriter = fn
 	return self
 }
@@ -289,14 +291,14 @@ func (self *Policy) WithRewriteURL(fn func(*Token, *url.URL) *url.URL) *Policy {
 // Deprecated: Use WithRewriteURL instead.
 func (self *Policy) RewriteTokenURL(fn func(*html.Token, *url.URL) *url.URL,
 ) *Policy {
-	return self.WithRewriteURL(func(t *Token, u *url.URL) *url.URL {
+	return self.WithRewriteURL(func(t *Token, _ string, u *url.URL) *url.URL {
 		return fn(&t.Token, u)
 	})
 }
 
 // Deprecated: Use WithRewriteURL instead.
 func (self *Policy) RewriteURL(fn func(*url.URL)) *Policy {
-	return self.WithRewriteURL(func(_ *Token, u *url.URL) *url.URL {
+	return self.WithRewriteURL(func(_ *Token, _ string, u *url.URL) *url.URL {
 		fn(u)
 		if *u == emptyURL {
 			return nil

@@ -22,7 +22,7 @@ This project is a fork of bluemonday. Changes from
   Example:
 
   ```go
-  p.WithRewriteURL(func(_ *bluemonday.Token, u *url.URL) *url.URL {
+  p.WithRewriteURL(func(t *bluemonday.Token, attr string, u *url.URL) *url.URL {
     if u.IsAbs() {
       return u
     }
