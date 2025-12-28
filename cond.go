@@ -5,7 +5,7 @@ import "strings"
 // PolicyCond is a condition, which defines should configured policy be applied
 // or skipped. Some policies use it to do something conditionally, like
 // [Policy.SetAttrIf].
-type PolicyCond func(t *token) bool
+type PolicyCond func(t *Token) bool
 
 // DomainIn checks that current HTML element has parseable URL and its hostname
 // or domain is one of given domains.
@@ -13,8 +13,8 @@ type PolicyCond func(t *token) bool
 // This condition expects [Policy.RequireParseableURLs] set to true or it always
 // evaluates to false.
 func DomainIn(domains ...string) PolicyCond {
-	return func(t *token) bool {
-		u := t.URL()
+	return func(t *Token) bool {
+		u := t.url()
 		if u == nil {
 			return false
 		}

@@ -36,7 +36,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/net/html"
 	"golang.org/x/net/html/atom"
 )
 
@@ -229,7 +228,7 @@ func TestOpenPolicy(t *testing.T) {
 	proxyURL, err := url.Parse("http://localhost/proxy")
 	require.NoError(t, err)
 
-	p := OpenPolicy().RewriteTokenURL(func(t *html.Token, u *url.URL) *url.URL {
+	p := OpenPolicy().WithRewriteURL(func(t *Token, u *url.URL) *url.URL {
 		if t.DataAtom == atom.Img {
 			u2 := *proxyURL
 			values := u2.Query()

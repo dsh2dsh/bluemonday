@@ -2754,7 +2754,7 @@ func TestRewriteURL(t *testing.T) {
 
 	p.AllowAttrs("poster").OnElements("video")
 
-	p.RewriteTokenURL(func(_ *html.Token, u *url.URL) *url.URL {
+	p.WithRewriteURL(func(_ *Token, u *url.URL) *url.URL {
 		if u.IsAbs() {
 			return u
 		}
@@ -2877,7 +2877,7 @@ func TestSrcSet(t *testing.T) {
 	require.NoError(t, err)
 
 	p := UGCPolicy().AllowAttrs("src", "srcset").OnElements("source")
-	p.RewriteTokenURL(func(_ *html.Token, u *url.URL) *url.URL {
+	p.WithRewriteURL(func(_ *Token, u *url.URL) *url.URL {
 		if u.IsAbs() {
 			return u
 		}

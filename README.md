@@ -10,22 +10,25 @@ This project is a fork of bluemonday. Changes from
 
   [#153]:https://github.com/microcosm-cc/bluemonday/pull/153
 
-* Rewriting URL of any attribute of a resource downloading tags
+* Rewriting URL of a resource downloading tags.
 
-  `RewriteTokenURL()` will rewrite any attribute of a resource downloading tag
-  (e.g. `<a>`, `<img>`, `<script>`, `<iframe>`) using the provided function.
+  `WithRewriteURL` will rewrite URL of a resource downloading tag (e.g. `<a>`,
+  `<img>`, `<script>`, `<iframe>` and so on) using the provided function.
+
+  If given function will return nil it means delete attribute which contains
+  this URL. In some cases, like for `<a>` or `<iframe>`, it means delete this
+  element.
+
   Example:
 
   ```go
-  p.RewriteTokenURL(func(_ *html.Token, u *url.URL) *url.URL {
+  p.WithRewriteURL(func(_ *bluemonday.Token, u *url.URL) *url.URL {
     if u.IsAbs() {
       return u
     }
     return pageURL.ResolveReference(u)
   })
   ```
-
-  An URL attribute can be removed by returning `nil`.
 
   `RewriteURL` is deprecated, but still works.
 

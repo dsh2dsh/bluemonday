@@ -11,7 +11,7 @@ import (
 type tokenizer struct {
 	*html.Tokenizer
 
-	token token
+	token Token
 
 	skipClosingTags []closingTag
 }
@@ -25,7 +25,7 @@ func newTokenizer(r io.Reader) *tokenizer {
 	return &tokenizer{
 		Tokenizer: html.NewTokenizer(r),
 
-		token: token{
+		token: Token{
 			Token: html.Token{Attr: []html.Attribute{}},
 
 			hideDepth: -1,
@@ -44,7 +44,7 @@ func (self *tokenizer) Next() html.TokenType {
 		self.validateClosingTags()
 	}
 
-	t.Reset()
+	t.reset()
 	t.Type = self.Tokenizer.Next()
 	return t.Type
 }
@@ -59,7 +59,7 @@ func (self *tokenizer) validateClosingTags() {
 	}
 }
 
-func (self *tokenizer) Token() *token {
+func (self *tokenizer) Token() *Token {
 	t := &self.token
 	switch t.Type {
 	case html.TextToken, html.CommentToken, html.DoctypeToken:

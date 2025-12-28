@@ -17,7 +17,7 @@ type setAttrPolicy struct {
 	cond PolicyCond
 }
 
-func (self *setAttrPolicy) SetIfMatch(t *token) {
+func (self *setAttrPolicy) SetIfMatch(t *Token) {
 	if self.cond == nil || self.cond(t) {
 		t.SetAttr(self.attr)
 	}

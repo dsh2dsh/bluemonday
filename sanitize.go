@@ -48,6 +48,8 @@ const genericErrMsg = "bluemonday: %w"
 var (
 	dataInvalidChars    = regexp.MustCompile("[A-Z;]+")
 	dataURIbase64Prefix = regexp.MustCompile(`^data:[^,]*;base64,`)
+
+	emptyURL url.URL
 )
 
 // Sanitize takes a string that contains a HTML fragment or document and applies
@@ -243,7 +245,7 @@ func (self *Policy) sanitize(r io.Reader, w io.Writer) error {
 	}
 }
 
-func nextToken(t *tokenizer) (*token, error) {
+func nextToken(t *tokenizer) (*Token, error) {
 	if t.Next() != html.ErrorToken {
 		return t.Token(), nil
 	}
@@ -257,7 +259,7 @@ func nextToken(t *tokenizer) (*token, error) {
 	return nil, fmt.Errorf(genericErrMsg, err)
 }
 
-func (self *Policy) commentToken(t *token, w io.StringWriter) error {
+func (self *Policy) commentToken(t *Token, w io.StringWriter) error {
 	// Comments are ignored by default
 	if !self.comments {
 		return nil
@@ -292,7 +294,7 @@ func (self *Policy) safeAtom(a atom.Atom) bool {
 // sanitizeAttrs takes a set of element attribute policies and the global
 // attribute policies and applies them to the []html.Attribute returning a set
 // of html.Attributes that match the policies.
-func (self *Policy) sanitizeAttrs(t *token, el *element) {
+func (self *Policy) sanitizeAttrs(t *Token, el *element) {
 	attrs := self.modifyTokenAttr(t)
 	if len(attrs) == 0 {
 		return
@@ -330,16 +332,16 @@ func (self *Policy) sanitizeAttrs(t *token, el *element) {
 	self.setCondAttrs(t)
 }
 
-func (self *Policy) modifyTokenAttr(t *token) []html.Attribute {
+func (self *Policy) modifyTokenAttr(t *Token) []html.Attribute {
 	if self.callbackAttr != nil {
 		t.Attr = self.callbackAttr(&t.Token)
 	}
-	return t.Reset()
+	return t.reset()
 }
 
 // appendAttrs builds a new attribute slice based on the whether the attribute
 // has been allowed explicitly or globally.
-func (self *Policy) appendAttrs(t *token, attrs []html.Attribute, el *element) {
+func (self *Policy) appendAttrs(t *Token, attrs []html.Attribute, el *element) {
 	if self.open {
 		t.Append(attrs...)
 		return
@@ -358,7 +360,7 @@ func (self *Policy) appendAttrs(t *token, attrs []html.Attribute, el *element) {
 	}
 }
 
-func (self *Policy) matchDataAttribute(t *token, attr html.Attribute) bool {
+func (self *Policy) matchDataAttribute(t *Token, attr html.Attribute) bool {
 	if !self.dataAttributes || !dataAttribute(attr.Key) {
 		return false
 	}
@@ -386,7 +388,7 @@ func dataAttribute(val string) bool {
 	return !dataInvalidChars.MatchString(rest)
 }
 
-func (self *Policy) matchStylePolicy(t *token, attr html.Attribute) bool {
+func (self *Policy) matchStylePolicy(t *Token, attr html.Attribute) bool {
 	// Is this a "style" attribute, and if so, do we need to sanitize it?
 	switch {
 	case attr.Key != "style":
@@ -406,7 +408,7 @@ func (self *Policy) matchStylePolicy(t *token, attr html.Attribute) bool {
 	return true
 }
 
-func (self *Policy) matchPolicy(t *token, attr html.Attribute, el *element,
+func (self *Policy) matchPolicy(t *Token, attr html.Attribute, el *element,
 ) bool {
 	// Is there an element specific attribute policy that applies?
 	if el.Match(attr) {
@@ -426,7 +428,7 @@ func (self *Policy) matchPolicy(t *token, attr html.Attribute, el *element,
 	return false
 }
 
-func linkable(t *token) bool {
+func linkable(t *Token) bool {
 	switch t.DataAtom {
 	case atom.A, atom.Area, atom.Base, atom.Link:
 		// elements that allow .href
@@ -442,7 +444,7 @@ func linkable(t *token) bool {
 	return false
 }
 
-func (self *Policy) sanitizeLinkable(t *token) {
+func (self *Policy) sanitizeLinkable(t *Token) {
 	var href *url.URL
 	if self.parseableURLs {
 		if href = self.validateURLs(t); href == nil {
@@ -463,7 +465,7 @@ func (self *Policy) sanitizeLinkable(t *token) {
 // - q.cite
 // - img.src
 // - script.src
-func (self *Policy) validateURLs(t *token) (href *url.URL) {
+func (self *Policy) validateURLs(t *Token) (href *url.URL) {
 	switch t.DataAtom {
 	case atom.A, atom.Area, atom.Base, atom.Link:
 		href = self.deleteInvalidURL(t, "href")
@@ -495,7 +497,7 @@ func (self *Policy) validateURLs(t *token) (href *url.URL) {
 	return href
 }
 
-func (self *Policy) deleteInvalidURL(t *token, name string,
+func (self *Policy) deleteInvalidURL(t *Token, name string,
 	rewriters ...func(*url.URL) *url.URL,
 ) *url.URL {
 	attr := t.Ref(name)
@@ -516,12 +518,12 @@ func (self *Policy) deleteInvalidURL(t *token, name string,
 		}
 	}
 
-	t.SetURL(u)
+	t.setURL(u)
 	attr.Val = u.String()
 	return u
 }
 
-func (self *Policy) validURL(t *token, rawurl string) *url.URL {
+func (self *Policy) validURL(t *Token, rawurl string) *url.URL {
 	// URLs are valid if when space is trimmed the URL is valid
 	rawurl = strings.TrimSpace(rawurl)
 
@@ -580,17 +582,16 @@ func (self *Policy) matchScheme(u *url.URL) bool {
 	return false
 }
 
-func (self *Policy) rewriteURL(t *token, u *url.URL) *url.URL {
+func (self *Policy) rewriteURL(t *Token, u *url.URL) *url.URL {
 	if u == nil {
 		return nil
 	}
 
 	if self.urlRewriter != nil {
-		return self.urlRewriter(&t.Token, u)
+		return self.urlRewriter(t, u)
 	}
 
-	var empty url.URL
-	if *u == empty {
+	if *u == emptyURL {
 		return nil
 	}
 	return u
@@ -605,14 +606,13 @@ func (self *Policy) rewriteSrc(u *url.URL) *url.URL {
 		self.srcRewriter(u)
 	}
 
-	var empty url.URL
-	if *u == empty {
+	if *u == emptyURL {
 		return nil
 	}
 	return u
 }
 
-func (self *Policy) sanitizeSrcSet(t *token) bool {
+func (self *Policy) sanitizeSrcSet(t *Token) bool {
 	const srcset = "srcset"
 	attr := t.Ref(srcset)
 	if attr == nil {
@@ -629,11 +629,11 @@ func (self *Policy) sanitizeSrcSet(t *token) bool {
 	return true
 }
 
-func (self *Policy) parseSrcSetAttribute(t *token, attr string,
+func (self *Policy) parseSrcSetAttribute(t *Token, attr string,
 ) ImageCandidates {
 	urlParser := func(s string) *url.URL {
 		if u := self.rewriteSrc(self.validURL(t, s)); u != nil {
-			t.SetURL(u)
+			t.setURL(u)
 			return u
 		}
 		return nil
@@ -649,7 +649,7 @@ func (self *Policy) requireRelTargetBlank() bool {
 		self.targetBlank
 }
 
-func (self *Policy) addRelTargetBlank(t *token, href *url.URL) {
+func (self *Policy) addRelTargetBlank(t *Token, href *url.URL) {
 	external, ok := externalLink(href, t)
 	if !ok {
 		return
@@ -673,7 +673,7 @@ func (self *Policy) addRelTargetBlank(t *token, href *url.URL) {
 		self.relNoReferrer || (external && self.relNoReferrerAbsOnly), noopener)
 }
 
-func externalLink(href *url.URL, t *token) (bool, bool) {
+func externalLink(href *url.URL, t *Token) (bool, bool) {
 	if href == nil {
 		attr := t.Ref("href")
 		if attr == nil {
@@ -688,7 +688,7 @@ func externalLink(href *url.URL, t *token) (bool, bool) {
 	return href.IsAbs() || href.Hostname() != "", true
 }
 
-func (self *Policy) setTargetBlank(t *token, required bool) bool {
+func (self *Policy) setTargetBlank(t *Token, required bool) bool {
 	const target, blank = "target", "_blank"
 	attr := t.Ref(target)
 
@@ -707,7 +707,7 @@ func (self *Policy) setTargetBlank(t *token, required bool) bool {
 	return attr.Val == blank
 }
 
-func (self *Policy) setRelAttr(t *token, nofollow, noreferrer, noopener bool) {
+func (self *Policy) setRelAttr(t *Token, nofollow, noreferrer, noopener bool) {
 	if !nofollow && !noreferrer && !noopener {
 		return
 	}
@@ -751,8 +751,8 @@ func (self *Policy) setRelAttr(t *token, nofollow, noreferrer, noopener bool) {
 	attr.Val += " " + value()
 }
 
-func (self *Policy) skipToken(t *token) bool {
-	if t.Skipped() {
+func (self *Policy) skipToken(t *Token) bool {
+	if t.skipped() {
 		return true
 	}
 
@@ -772,7 +772,7 @@ func (self *Policy) skipToken(t *token) bool {
 	return true
 }
 
-func (self *Policy) sandboxIframe(t *token) {
+func (self *Policy) sandboxIframe(t *Token) {
 	const sandbox = "sandbox"
 	attr := t.Ref(sandbox)
 	if attr == nil {
@@ -788,13 +788,13 @@ func (self *Policy) sandboxIframe(t *token) {
 	attr.Val = strings.Join(values, " ")
 }
 
-func (self *Policy) setCondAttrs(t *token) {
+func (self *Policy) setCondAttrs(t *Token) {
 	for _, attr := range self.setAttrsIf[t.Data] {
 		attr.SetIfMatch(t)
 	}
 }
 
-func (self *Policy) hideSkippedContent(t *token) {
+func (self *Policy) hideSkippedContent(t *Token) {
 	switch t.DataAtom {
 	case atom.Script, atom.Style:
 		if self.unsafe {
@@ -807,7 +807,7 @@ func (self *Policy) hideSkippedContent(t *token) {
 	}
 }
 
-func (self *Policy) textToken(t *token, w io.StringWriter) error {
+func (self *Policy) textToken(t *Token, w io.StringWriter) error {
 	switch t.ParentAtom() {
 	case atom.Script, atom.Style:
 		// not encouraged, but if a policy allows JavaScript or CSS styles we
