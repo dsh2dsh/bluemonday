@@ -25,7 +25,7 @@ func parseSrcSetAttribute(attr string, urlParser func(string) *url.URL,
 	n := strings.Count(attr, ", ")
 	images := make(ImageCandidates, 0, n+1)
 
-	for value := range strings.SplitSeq(attr, ",") {
+	for value := range strings.SplitSeq(attr, ", ") {
 		if image := parseImageCandidate(value, urlParser); image.valid {
 			images = append(images, image)
 		}

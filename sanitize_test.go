@@ -2868,7 +2868,7 @@ func TestSrcSet(t *testing.T) {
 		{
 			name:     "with relative URLs",
 			input:    `<img srcset="example-320w.jpg, example-480w.jpg 1.5x,   example-640,w.jpg 2x, example-640w.jpg 640w"/>`,
-			expected: `<img srcset="https://example.com/example-320w.jpg, https://example.com/example-480w.jpg 1.5x, https://example.com/example-640, https://example.com/w.jpg 2x, https://example.com/example-640w.jpg 640w"/>`,
+			expected: `<img srcset="https://example.com/example-320w.jpg, https://example.com/example-480w.jpg 1.5x, https://example.com/example-640,w.jpg 2x, https://example.com/example-640w.jpg 640w"/>`,
 		},
 		{
 			name:     "with absolute URLs",
@@ -2883,7 +2883,7 @@ func TestSrcSet(t *testing.T) {
 		{
 			name:     "with comma URL",
 			input:    `<img srcset="http://example.org/example,a:b/d.jpg , example-480w.jpg 1.5x"/>`,
-			expected: `<img srcset="http://example.org/example, https://example.com/example-480w.jpg 1.5x"/>`,
+			expected: `<img srcset="http://example.org/example,a:b/d.jpg, https://example.com/example-480w.jpg 1.5x"/>`,
 		},
 		{
 			name:  "with incorrect descriptor",
@@ -2896,7 +2896,7 @@ func TestSrcSet(t *testing.T) {
 		{
 			name:     "picture source",
 			input:    `<picture><source srcset="/folder/image2.png 656w,   /folder/image3.png 360w, some,image.png 2x"/></picture>`,
-			expected: `<picture><source srcset="https://example.com/folder/image2.png 656w, https://example.com/folder/image3.png 360w, https://example.com/some, https://example.com/image.png 2x"/></picture>`,
+			expected: `<picture><source srcset="https://example.com/folder/image2.png 656w, https://example.com/folder/image3.png 360w, https://example.com/some,image.png 2x"/></picture>`,
 		},
 	}
 
