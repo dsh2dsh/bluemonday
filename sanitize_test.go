@@ -2835,7 +2835,7 @@ func TestSrcSet(t *testing.T) {
 	}{
 		{
 			name:     "img srcset",
-			input:    `<img srcset="https://example.org/example-320w.jpg, https://example.org/example-480w.jpg 1.5x, https://example.org/example-640w.jpg 2x, https://example.org/example-640w.jpg 640w" src="https://example.org/example-640w.jpg" alt="Example"/>`,
+			input:    `<img srcset="https://example.org/example-320w.jpg, https://example.org/example-480w.jpg 1.5x, https://example.org/example-640w.jpg 2x,https://example.org/example-640w.jpg 640w" src="https://example.org/example-640w.jpg" alt="Example"/>`,
 			expected: `<img srcset="https://example.org/example-320w.jpg, https://example.org/example-480w.jpg 1.5x, https://example.org/example-640w.jpg 2x, https://example.org/example-640w.jpg 640w" src="https://example.org/example-640w.jpg" alt="Example"/>`,
 		},
 		{

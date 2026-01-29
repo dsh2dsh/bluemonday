@@ -620,18 +620,16 @@ func (self *Policy) sanitizeSrcSet(t *Token) bool {
 		return false
 	}
 
-	images := self.parseSrcSetAttribute(t, attr)
-	if len(images) == 0 {
+	s := self.parseSrcSetAttribute(t, attr)
+	if s == "" {
 		t.Delete(srcset)
 		return false
 	}
-
-	attr.Val = images.String()
+	attr.Val = s
 	return true
 }
 
-func (self *Policy) parseSrcSetAttribute(t *Token, attr *html.Attribute,
-) ImageCandidates {
+func (self *Policy) parseSrcSetAttribute(t *Token, attr *html.Attribute) string {
 	urlParser := func(s string) *url.URL {
 		a := *attr
 		a.Val = s
@@ -641,7 +639,15 @@ func (self *Policy) parseSrcSetAttribute(t *Token, attr *html.Attribute,
 		}
 		return nil
 	}
-	return parseSrcSetAttribute(attr.Val, urlParser)
+
+	var b strings.Builder
+	for image := range parseSrcsetSeq(attr.Val, urlParser) {
+		if b.Len() != 0 {
+			b.WriteString(", ")
+		}
+		b.WriteString(image.String())
+	}
+	return b.String()
 }
 
 func (self *Policy) requireRelTargetBlank() bool {
