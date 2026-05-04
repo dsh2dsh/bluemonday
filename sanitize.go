@@ -550,13 +550,13 @@ func (self *Policy) validURL(t *Token, attr *html.Attribute) *url.URL {
 		return nil
 	}
 
-	if self.matchScheme(u) {
+	if self.MatchScheme(u) {
 		return self.rewriteURL(t, attr, u)
 	}
 	return nil
 }
 
-func (self *Policy) matchScheme(u *url.URL) bool {
+func (self *Policy) MatchScheme(u *url.URL) bool {
 	if self.open {
 		return true
 	}
