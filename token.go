@@ -85,7 +85,7 @@ func (self *Token) topHidden() bool {
 }
 
 func (self *Token) hasParent() bool {
-	for i := len(self.parents) - 1; i >= 0; i-- {
+	for i := range slices.Backward(self.parents) {
 		if self.DataAtom == self.parents[i] {
 			return true
 		}
