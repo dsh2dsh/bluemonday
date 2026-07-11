@@ -38,6 +38,8 @@ This project is a fork of bluemonday. Changes from
 
   * `<source src="">`
 
+  * `<object data="">`
+
 * Optionally remove content of specific allowed HTML elements
 
   For allowed HTML elements `SkipElementsContent` marks their content is needed

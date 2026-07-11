@@ -440,6 +440,9 @@ func linkable(t *Token) bool {
 		atom.Source, atom.Track, atom.Video:
 		// elements that allow .src
 		return true
+	case atom.Object:
+		// elements that allow .data
+		return true
 	}
 	return false
 }
@@ -477,8 +480,7 @@ func (self *Policy) validateURLs(t *Token) (href *url.URL) {
 		self.deleteInvalidURL(t, "src", self.rewriteSrc)
 
 	case atom.Iframe:
-		if src := self.deleteInvalidURL(t, "src", self.rewriteSrc); src == nil {
-			t.Skip()
+		if self.skipInvalidURL(t, "src") {
 			return nil
 		}
 
@@ -493,6 +495,11 @@ func (self *Policy) validateURLs(t *Token) (href *url.URL) {
 	case atom.Video:
 		self.deleteInvalidURL(t, "poster", self.rewriteSrc)
 		self.deleteInvalidURL(t, "src", self.rewriteSrc)
+
+	case atom.Object:
+		if self.skipInvalidURL(t, "data") {
+			return nil
+		}
 	}
 	return href
 }
@@ -521,6 +528,15 @@ func (self *Policy) deleteInvalidURL(t *Token, name string,
 	t.setURL(u)
 	attr.Val = u.String()
 	return u
+}
+
+func (self *Policy) skipInvalidURL(t *Token, attrName string) bool {
+	u := self.deleteInvalidURL(t, attrName, self.rewriteSrc)
+	if u != nil {
+		return true
+	}
+	t.Skip()
+	return true
 }
 
 func (self *Policy) validURL(t *Token, attr *html.Attribute) *url.URL {

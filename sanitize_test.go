@@ -193,11 +193,16 @@ func TestLinks(t *testing.T) {
 			in:       `<source src="giraffe.gif" />`,
 			expected: `<source src="https://proxy.example.com/?u=giraffe.gif"/>`,
 		},
+		{
+			in:       `<object data="giraffe.svg" type="image/svg+xml"></object>`,
+			expected: `<object data="https://proxy.example.com/?u=giraffe.svg" type="image/svg+xml"></object>`,
+		},
 	}
 
 	p := UGCPolicy()
 	p.RequireParseableURLs(true)
 	p.AllowAttrs("src").OnElements("video", "source")
+	p.AllowAttrs("data", "type").OnElements("object")
 	p.RewriteSrc(func(u *url.URL) {
 		// Proxify all requests to "https://proxy.example.com/?u=http://example.com/"
 		// This is a contrived example, but it shows how to rewrite URLs
@@ -1328,6 +1333,12 @@ func TestSkipElementsContent(t *testing.T) {
 	p.AllowElementsContent("iframe")
 	assert.Equal(t,
 		`<iframe src="https://www.youtube.com/">&lt;p&gt;test&lt;/p&gt;</iframe>`,
+		p.Sanitize(input))
+
+	input = `<object data="https://example.org/123.svg" type="image/svg+xml"><p>test</p></object>`
+	p.AllowAttrs("data", "type").OnElements("object")
+	assert.Equal(t,
+		`<object data="https://example.org/123.svg" type="image/svg+xml"></object>`,
 		p.Sanitize(input))
 }
 
@@ -2755,6 +2766,19 @@ func TestRewriteURL(t *testing.T) {
 			dataAtom: atom.Img,
 			attr:     atom.Src.String(),
 		},
+		{
+			name:     "object data",
+			in:       `<object data="giraffe.gif" type="image/svg+xml"></object>`,
+			expected: `<object data="https://example.com/giraffe.gif" type="image/svg+xml"></object>`,
+			dataAtom: atom.Object,
+			attr:     atom.Data.String(),
+		},
+		{
+			name:     "object removed",
+			in:       `<object data="removeme.gif" type="image/svg+xml"></object>`,
+			dataAtom: atom.Object,
+			attr:     atom.Data.String(),
+		},
 	}
 
 	pageURL, err := url.Parse("https://example.com/page.html")
@@ -2765,6 +2789,7 @@ func TestRewriteURL(t *testing.T) {
 		AddTargetBlankToFullyQualifiedLinks(true)
 
 	p.AllowAttrs("poster").OnElements("video")
+	p.AllowAttrs("data", "type").OnElements("object")
 
 	var gotAtom atom.Atom
 	var gotAttr string
