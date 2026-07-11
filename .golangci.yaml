@@ -137,4 +137,5 @@ linters:
       - path: '_test\.go'
         linters:
           - "errcheck"
+          - "prealloc"
           - "wrapcheck"
