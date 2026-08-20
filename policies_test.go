@@ -247,3 +247,42 @@ func TestOpenPolicy(t *testing.T) {
 		})
 	}
 }
+
+func TestMathML(t *testing.T) {
+	in := `<math xmlns="http://www.w3.org/1998/Math/MathML"><msup><mi>x</mi><mn>2</mn></msup></math>`
+
+	p := UGCPolicy()
+	p.AllowAttrs("xmlns").OnElements("math")
+	p.AllowNoAttrs().OnElements(
+		"annotation",
+		"annotation-xml",
+		"maction",
+		"merror",
+		"mfrac",
+		"mi",
+		"mmultiscripts",
+		"mn",
+		"mo",
+		"mover",
+		"mpadded",
+		"mphantom",
+		"mprescripts",
+		"mroot",
+		"mrow",
+		"ms",
+		"mspace",
+		"msqrt",
+		"mstyle",
+		"msub",
+		"msubsup",
+		"msup",
+		"mtable",
+		"mtd",
+		"mtext",
+		"mtr",
+		"munder",
+		"munderover",
+		"semantics",
+	)
+	assert.Equal(t, in, p.Sanitize(in))
+}
