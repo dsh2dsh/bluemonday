@@ -78,23 +78,6 @@ func (self *Policy) policies(name string) (el *element) {
 	return el
 }
 
-func (self *Policy) allowedElement(name string) bool {
-	if self.open {
-		return true
-	}
-
-	if _, ok := self.elements[name]; ok {
-		return true
-	}
-
-	for re := range self.matchingElements {
-		if re.MatchString(name) {
-			return true
-		}
-	}
-	return false
-}
-
 type element struct {
 	attrs map[string][]*attrPolicy
 }

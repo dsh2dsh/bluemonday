@@ -197,7 +197,7 @@ func (self *Policy) sanitize(r io.Reader, w io.Writer) error {
 
 			if t.hidden() {
 				continue
-			} else if tokenizer.Skipped() || !self.allowedElement(t.Data) {
+			} else if tokenizer.Skipped() {
 				if err := self.maybeAddSpaces(buff); err != nil {
 					return err
 				}

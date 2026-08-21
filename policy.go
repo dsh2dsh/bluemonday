@@ -479,7 +479,10 @@ func (self *Policy) WithStyleHandler(h func(tag, style string) string) *Policy {
 
 // AllowElements will append HTML elements to the allowlist without applying an
 // attribute policy to those elements (the elements are permitted
-// sans-attributes)
+// sans-attributes). Allowed elements are allowed only if they have allowed
+// attributes, defined by another policies, like [AttrPolicyBuilder.Globally].
+//
+// May be actually you need [Policy.AllowNoAttrs].
 func (self *Policy) AllowElements(names ...string) *Policy {
 	self.init()
 	for _, name := range names {
@@ -489,7 +492,10 @@ func (self *Policy) AllowElements(names ...string) *Policy {
 }
 
 // AllowElementsMatching will append HTML elements to the allowlist if they
-// match a regexp.
+// match a regexp. Allowed elements are allowed only if they have allowed
+// attributes, defined by another policies, like [AttrPolicyBuilder.Globally].
+//
+// May be actually you need [Policy.AllowNoAttrs].
 func (self *Policy) AllowElementsMatching(re *regexp.Regexp) *Policy {
 	self.init()
 	self.allowMatching(re)

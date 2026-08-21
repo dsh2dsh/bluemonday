@@ -246,3 +246,18 @@ func TestWithStyleHandler(t *testing.T) {
 		`<div><p style="color: red;"></p></div>`,
 		p.Sanitize(`<div style="color: blue;"><p style="color: red;"></p></div>`))
 }
+
+func TestAllowElements(t *testing.T) {
+	p := NewPolicy()
+	p.AllowAttrs("attr").Globally()
+	p.AllowElements("tag1", "tag2")
+
+	in := `
+<tag1 attr="attr">a</tag1>
+<tag2>b</tag2>`
+
+	assert.Equal(t, `
+<tag1 attr="attr">a</tag1>
+b`,
+		p.Sanitize(in))
+}
