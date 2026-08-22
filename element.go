@@ -101,7 +101,7 @@ func (self *element) Clone() *element {
 
 func (self *element) Delete(name string) { delete(self.attrs, name) }
 
-func (self *element) Match(attr html.Attribute) bool {
+func (self *element) Match(attr *html.Attribute) bool {
 	if self.attrs == nil {
 		return false
 	}
@@ -114,7 +114,7 @@ func (self *element) Match(attr html.Attribute) bool {
 	}
 
 	for _, ap := range policies {
-		if ap.Match(attr.Val) {
+		if ap.Match(attr) {
 			return true
 		}
 	}

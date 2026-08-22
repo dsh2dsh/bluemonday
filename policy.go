@@ -173,6 +173,8 @@ type Policy struct {
 	open bool // pass all elements and attributes as is
 }
 
+type attrHandlerFunc func(attr html.Attribute) string
+
 type attrPolicy struct {
 	single string
 	values map[string]struct{}
@@ -180,28 +182,41 @@ type attrPolicy struct {
 	// optional pattern to match, when not nil the regexp needs to match
 	// otherwise the attribute is removed
 	regexp *regexp.Regexp
+
+	handler attrHandlerFunc
 }
 
-func (self *attrPolicy) Match(value string) bool {
+func (self *attrPolicy) Match(attr *html.Attribute) bool {
 	matched := true
 	if self.single != "" {
-		if strings.EqualFold(self.single, value) {
+		if strings.EqualFold(self.single, attr.Val) {
 			return true
 		}
 		matched = false
 	}
 
 	if self.values != nil {
-		if _, ok := self.values[strings.ToLower(value)]; ok {
+		if _, ok := self.values[strings.ToLower(attr.Val)]; ok {
 			return true
 		}
 		matched = false
 	}
 
-	if self.regexp == nil {
-		return matched
+	if self.regexp != nil {
+		if self.regexp.MatchString(attr.Val) {
+			return true
+		}
+		matched = false
 	}
-	return self.regexp.MatchString(value)
+
+	if self.handler != nil {
+		if s := self.handler(*attr); s != "" {
+			attr.Val = s
+			return true
+		}
+		matched = false
+	}
+	return matched
 }
 
 type AttrPolicyBuilder struct {
@@ -210,6 +225,7 @@ type AttrPolicyBuilder struct {
 	attrNames  []string
 	regexp     *regexp.Regexp
 	values     []string
+	handler    attrHandlerFunc
 	allowEmpty bool
 }
 
@@ -389,6 +405,18 @@ func (self *AttrPolicyBuilder) WithValues(values ...string) *AttrPolicyBuilder {
 	return self
 }
 
+// MatchingHandler sets h as a custom sanitizer for attributes and returns
+// updated policy.
+//
+// The custom sanitizer returns sanitized content of an attribute. Returned
+// empty string means this attribute is not allowed.
+func (self *AttrPolicyBuilder) MatchingHandler(
+	h func(attr html.Attribute) string,
+) *AttrPolicyBuilder {
+	self.handler = h
+	return self
+}
+
 // OnElements will bind an attribute policy to a given range of HTML elements
 // and return the updated policy
 func (self *AttrPolicyBuilder) OnElements(names ...string) *Policy {
@@ -407,7 +435,11 @@ func (self *AttrPolicyBuilder) OnElements(names ...string) *Policy {
 }
 
 func (self *AttrPolicyBuilder) attrPolicy() *attrPolicy {
-	ap := &attrPolicy{regexp: self.regexp}
+	ap := &attrPolicy{
+		handler: self.handler,
+		regexp:  self.regexp,
+	}
+
 	switch n := len(self.values); {
 	case n == 1:
 		ap.single = self.values[0]

@@ -411,7 +411,7 @@ func (self *Policy) matchStylePolicy(t *Token, attr html.Attribute) bool {
 func (self *Policy) matchPolicy(t *Token, attr html.Attribute, el *element,
 ) bool {
 	// Is there an element specific attribute policy that applies?
-	if el.Match(attr) {
+	if el.Match(&attr) {
 		t.Append(attr)
 		return true
 	}
@@ -419,7 +419,7 @@ func (self *Policy) matchPolicy(t *Token, attr html.Attribute, el *element,
 	// Is there a global attribute policy that applies?
 	if apl, ok := self.globalAttrs[attr.Key]; ok {
 		for _, ap := range apl {
-			if ap.Match(attr.Val) {
+			if ap.Match(&attr) {
 				t.Append(attr)
 				return true
 			}
