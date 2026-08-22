@@ -173,7 +173,10 @@ type Policy struct {
 	open bool // pass all elements and attributes as is
 }
 
-type attrHandlerFunc func(attr html.Attribute) string
+// AttrMatchingHandlerFunc is a handler for [AttrPolicyBuilder.MatchingHandler],
+// which sanitized attribute value. It returns sanitized content of an
+// attribute. Returned empty string means this attribute is not allowed.
+type AttrMatchingHandlerFunc func(attr html.Attribute) string
 
 type attrPolicy struct {
 	single string
@@ -183,7 +186,7 @@ type attrPolicy struct {
 	// otherwise the attribute is removed
 	regexp *regexp.Regexp
 
-	handler attrHandlerFunc
+	handler AttrMatchingHandlerFunc
 }
 
 func (self *attrPolicy) Match(attr *html.Attribute) bool {
@@ -225,7 +228,7 @@ type AttrPolicyBuilder struct {
 	attrNames  []string
 	regexp     *regexp.Regexp
 	values     []string
-	handler    attrHandlerFunc
+	handler    AttrMatchingHandlerFunc
 	allowEmpty bool
 }
 

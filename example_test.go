@@ -238,3 +238,13 @@ func ExamplePolicy_SanitizeReader() {
 	// Output:
 	// <a href="http://www.google.com" rel="nofollow">Google</a>
 }
+
+func ExampleAsListValues() {
+	p := bluemonday.UGCPolicy()
+	p.AllowAttrs("class").
+		MatchingHandler(bluemonday.AsListValues("nerdfont", "rainbow")).
+		OnElements("span")
+	fmt.Println(p.Sanitize(`<span class="nerdfont rainbow foo">abc</span>`))
+	// Output:
+	// <span class="nerdfont rainbow">abc</span>
+}

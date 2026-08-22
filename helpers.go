@@ -33,6 +33,9 @@ import (
 	"encoding/base64"
 	"net/url"
 	"regexp"
+	"strings"
+
+	"golang.org/x/net/html"
 )
 
 // A selection of regular expressions that can be used as .Matching() rules on
@@ -254,6 +257,31 @@ func ImageAlign() []string { return imageAlign[:] }
 // values for lists
 // https://developer.mozilla.org/en-US/docs/Web/HTML/Element/ol#attr-type
 func ListType() []string { return listType[:] }
+
+// AsListValues returns [AttrPolicyBuilder.MatchingHandler], which sanitize
+// attribute value as space separated list with allowed values.
+func AsListValues(values ...string) AttrMatchingHandlerFunc {
+	return func(attr html.Attribute) (value string) {
+		if value = strings.TrimSpace(attr.Val); value == "" {
+			return value
+		}
+
+		var sb strings.Builder
+		for item := range strings.SplitSeq(value, " ") {
+			item = strings.TrimSpace(item)
+			for _, s := range values {
+				if !strings.EqualFold(item, s) {
+					continue
+				}
+				if sb.Len() != 0 {
+					sb.WriteByte(' ')
+				}
+				sb.WriteString(s)
+			}
+		}
+		return sb.String()
+	}
+}
 
 // AllowStandardURLs is a convenience function that will enable rel="nofollow"
 // on "a", "area" and "link" (if you have allowed those elements) and will

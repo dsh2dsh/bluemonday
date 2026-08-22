@@ -31,11 +31,9 @@ package bluemonday
 
 import (
 	"regexp"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"golang.org/x/net/html"
 )
 
 func TestAllowElementsContent(t *testing.T) {
@@ -269,27 +267,8 @@ func TestMatchingHandler(t *testing.T) {
 	in := `<span class="nerdfont rainbow foo">abc</span>`
 	assert.Equal(t, `<span>abc</span>`, p.Sanitize(in))
 
-	safeClasses := func(attr html.Attribute) (value string) {
-		if value = strings.TrimSpace(attr.Val); value == "" {
-			return value
-		}
-
-		var sb strings.Builder
-		for className := range strings.SplitSeq(value, " ") {
-			className = strings.TrimSpace(className)
-			switch className {
-			case "nerdfont", "rainbow":
-			default:
-				continue
-			}
-			if sb.Len() != 0 {
-				sb.WriteByte(' ')
-			}
-			sb.WriteString(className)
-		}
-		return sb.String()
-	}
-
-	p.AllowAttrs("class").MatchingHandler(safeClasses).OnElements("span")
+	p.AllowAttrs("class").
+		MatchingHandler(AsListValues("nerdfont", "rainbow")).
+		OnElements("span")
 	assert.Equal(t, `<span class="nerdfont rainbow">abc</span>`, p.Sanitize(in))
 }
