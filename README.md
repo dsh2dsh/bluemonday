@@ -144,6 +144,12 @@ This project is a fork of bluemonday. Changes from
 
   Don't use this policy, unless you sure the input document is safe!
 
+* `(*AttrPolicyBuilder).MatchingHandler`
+
+  `MatchingHandler` sets a custom sanitizer for attributes and returns updated
+  policy. The custom sanitizer returns sanitized content of an attribute.
+  Returned empty string means this attribute is not allowed.
+
 ---
 
 bluemonday is a HTML sanitizer implemented in Go. It is fast and highly configurable.
