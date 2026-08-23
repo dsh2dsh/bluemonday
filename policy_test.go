@@ -264,7 +264,7 @@ b`,
 
 func TestMatchingHandler(t *testing.T) {
 	p := UGCPolicy()
-	in := `<span class="nerdfont rainbow foo">abc</span>`
+	in := `<span class="nerdfont rainbow  foo   bar">abc</span>`
 	assert.Equal(t, `<span>abc</span>`, p.Sanitize(in))
 
 	p.AllowAttrs("class").

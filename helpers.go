@@ -33,6 +33,7 @@ import (
 	"encoding/base64"
 	"net/url"
 	"regexp"
+	"slices"
 	"strings"
 
 	"golang.org/x/net/html"
@@ -266,17 +267,14 @@ func AsListValues(values ...string) AttrMatchingHandlerFunc {
 			return value
 		}
 
+		const sep = " "
 		var sb strings.Builder
-		for item := range strings.SplitSeq(value, " ") {
-			item = strings.TrimSpace(item)
-			for _, s := range values {
-				if !strings.EqualFold(item, s) {
-					continue
-				}
+		for item := range strings.SplitSeq(value, sep) {
+			if item != sep && slices.Contains(values, item) {
 				if sb.Len() != 0 {
 					sb.WriteByte(' ')
 				}
-				sb.WriteString(s)
+				sb.WriteString(item)
 			}
 		}
 		return sb.String()
